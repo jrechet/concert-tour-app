@@ -1,31 +1,24 @@
-"""FastAPI application main module."""
-
 from fastapi import FastAPI
-
-from .database import engine
-from .models import Base
-from .routers import tours
-
-# Create tables
-Base.metadata.create_all(bind=engine)
+from src.database import create_tables
+from src.models import Tour, Concert
 
 app = FastAPI(
     title="Concert Tour API",
-    description="API for managing concert tours and related data",
+    description="API for managing concert tours and events",
     version="1.0.0"
 )
 
-# Include routers
-app.include_router(tours.router)
+
+@app.on_event("startup")
+def startup_event():
+    create_tables()
 
 
 @app.get("/")
 def read_root():
-    """Root endpoint."""
-    return {"message": "Welcome to Concert Tour API"}
+    return {"message": "Concert Tour API is running"}
 
 
 @app.get("/health")
 def health_check():
-    """Health check endpoint."""
     return {"status": "healthy"}
