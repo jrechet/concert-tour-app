@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Concert Tour Dashboard</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'music-dark': '#0A0A0A',
+                        'music-card': '#1A1A1A',
+                        'music-accent': '#8B5CF6',
+                        'music-secondary': '#A855F7',
+                        'music-text': '#E5E5E5',
+                        'music-muted': '#9CA3AF',
+                        'music-border': '#374151'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0A0A0A 0%, #1A1A1A 100%);
+        }
+        .card-glow {
+            box-shadow: 0 4px 20px rgba(139, 92, 246, 0.1);
+        }
+        .progress-bar {
+            background: linear-gradient(90deg, #8B5CF6 0%, #A855F7 100%);
+        }
+        .calendar-cell:hover {
+            background-color: rgba(139, 92, 246, 0.1);
+            border-color: #8B5CF6;
+        }
+        .stat-icon {
+            background: linear-gradient(135deg, #8B5CF6 0%, #A855F7 100%);
+        }
+    </style>
+</head>
+<body class="bg-music-dark text-music-text min-h-screen">
+    <!-- Header -->
+    <header class="bg-music-card border-b border-music-border">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold text-music-accent">🎵 Concert Tour Dashboard</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button class="bg-music-accent hover:bg-music-secondary px-4 py-2 rounded-lg text-white transition-colors">
+                        Profile
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Tour Overview Section -->
+        <div class="bg-music-card rounded-lg p-6 mb-8 card-glow border border-music-border" 
+             hx-get="/api/tours/current" 
+             hx-trigger="load" 
+             hx-target="#tour-overview-content">
+            <h2 class="text-xl font-semibold mb-4 text-music-accent">Tour Overview</h2>
+            <div id="tour-overview-content">
+                <!-- Default content while loading -->
+                <div class="space-y-4">
+                    <div>
+                        <h3 class="text-2xl font-bold">Loading Tour...</h3>
+                        <p class="text-music-muted">Fetching tour information...</p>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span>Progress</span>
+                            <span>--/--</span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded-full h-2">
+                            <div class="progress-bar h-2 rounded-full w-0 transition-all duration-500"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8" 
+             hx-get="/api/dashboard/stats" 
+             hx-trigger="load" 
+             hx-target="#stats-content">
+            <div id="stats-content">
+                <!-- Default stat cards while loading -->
+                <div class="bg-music-card rounded-lg p-6 card-glow border border-music-border">
+                    <div class="flex items-center">
+                        <div class="stat-icon p-3 rounded-lg mr-4">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l6-6v13M9 19l-6-6v13"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-music-muted text-sm">Concerts</p>
+                            <p class="text-2xl font-bold">--</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-music-card rounded-lg p-6 card-glow border border-music-border">
+                    <div class="flex items-center">
+                        <div class="stat-icon p-3 rounded-lg mr-4">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-music-muted text-sm">Cities</p>
+                            <p class="text-2xl font-bold">--</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-music-card rounded-lg p-6 card-glow border border-music-border">
+                    <div class="flex items-center">
+                        <div class="stat-icon p-3 rounded-lg mr-4">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-music-muted text-sm">Countries</p>
+                            <p class="text-2xl font-bold">--</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-music-card rounded-lg p-6 card-glow border border-music-border">
+                    <div class="flex items-center">
+                        <div class="stat-icon p-3 rounded-lg mr-4">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-music-muted text-sm">Capacity</p>
+                            <p class="text-2xl font-bold">--</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-music-card rounded-lg p-6 card-glow border border-music-border">
+                    <div class="flex items-center">
+                        <div class="stat-icon p-3 rounded-lg mr-4">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-music-muted text-sm">Revenue</p>
+                            <p class="text-2xl font-bold">$--</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Calendar Section -->
+            <div class="lg:col-span-2">
+                <div class="bg-music-card rounded-lg p-6 card-glow border border-music-border">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-xl font-semibold text-music-accent">Concert Calendar</h2>
+                        <div class="flex items-center space-x-2">
+                            <button class="p-2 hover:bg-music-accent hover:bg-opacity-20 rounded-lg transition-colors"
+                                    hx-get="/api/dashboard/calendar/prev" 
+                                    hx-target="#calendar-content">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                </svg>
+                            </button>
+                            <span class="text-lg font-medium" id="current-month">Loading...</span>
+                            <button class="p-2 hover:bg-music-accent hover:bg-opacity-20 rounded-lg transition-colors"
+                                    hx-get="/api/dashboard/calendar/next" 
+                                    hx-target="#calendar-content">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="calendar-content" 
+                         hx-get="/api/dashboard/calendar" 
+                         hx-trigger="load">
+                        <!-- Calendar will be loaded here -->
+                        <div class="grid grid-cols-7 gap-1 mb-4">
+                            <div class="text-center font-medium py-2 text-music-muted">Sun</div>
+                            <div class="text-center font-medium py-2 text-music-muted">Mon</div>
+                            <div class="text-center font-medium py-2 text-music-muted">Tue</div>
+                            <div class="text-center font-medium py-2 text-music-muted">Wed</div>
+                            <div class="text-center font-medium py-2 text-music-muted">Thu</div>
+                            <div class="text-center font-medium py-2 text-music-muted">Fri</div>
+                            <div class="text-center font-medium py-2 text-music-muted">Sat</div>
+                        </div>
+                        <div class="grid grid-cols-7 gap-1">
+                            <!-- Calendar days will be generated by HTMX -->
+                            <div class="aspect-square p-2 border border-music-border rounded calendar-cell">
+                                <div class="text-center text-music-muted">Loading...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions & Recent Activity -->
+            <div class="space-y-6">
+                <!-- Quick Actions -->
+                <div class="bg-music-card rounded-lg p-6 card-glow border border-music-border">
+                    <h3 class="text-lg font-semibold mb-4 text-music-accent">Quick Actions</h3>
+                    <div class="space-y-3">
+                        <a href="/concerts/add" 
+                           class="block w-full bg-music-accent hover:bg-music-secondary text-white text-center py-3 px-4 rounded-lg transition-colors font-medium">
+                            + Add Concert
+                        </a>
+                        <a href="/setlists" 
+                           class="block w-full bg-gray-600 hover:bg-gray-500 text-white text-center py-3 px-4 rounded-lg transition-colors font-medium">
+                            📝 View Setlists
+                        </a>
+                        <button class="w-full bg-gray-700 hover:bg-gray-600 text-white py-3 px-4 rounded-lg transition-colors font-medium"
+                                hx-get="/api/dashboard/export" 
+                                hx-target="#export-result">
+                            📊 Export Data
+                        </button>
+                        <div id="export-result"></div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="bg-music-card rounded-lg p-6 card-glow border border-music-border"
+                     hx-get="/api/dashboard/recent-activity" 
+                     hx-trigger="load" 
+                     hx-target="#activity-content">
+                    <h3 class="text-lg font-semibold mb-4 text-music-accent">Recent Activity</h3>
+                    <div id="activity-content">
+                        <div class="space-y-3">
+                            <div class="text-music-muted text-sm">Loading recent activity...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Upcoming Concerts -->
+                <div class="bg-music-card rounded-lg p-6 card-glow border border-music-border"
+                     hx-get="/api/dashboard/upcoming-concerts" 
+                     hx-trigger="load" 
+                     hx-target="#upcoming-content">
+                    <h3 class="text-lg font-semibold mb-4 text-music-accent">Upcoming Concerts</h3>
+                    <div id="upcoming-content">
+                        <div class="space-y-3">
+                            <div class="text-music-muted text-sm">Loading upcoming concerts...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auto-refresh for dynamic content -->
+    <script>
+        // Auto-refresh stats every 5 minutes
+        setInterval(function() {
+            htmx.trigger('#stats-content', 'refresh');
+        }, 300000);
+
+        // Auto-refresh activity every 2 minutes
+        setInterval(function() {
+            htmx.trigger('#activity-content', 'refresh');
+        }, 120000);
+    </script>
+</body>
+</html>
