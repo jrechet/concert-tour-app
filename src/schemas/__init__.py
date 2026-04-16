@@ -1,15 +1,17 @@
-"""
-Pydantic schemas for API request/response validation.
-"""
+"""Schemas package for Pydantic models."""
 
-from .tour import TourCreate, TourUpdate, TourResponse
-from .concert import ConcertCreate, ConcertUpdate, ConcertResponse
+from .venue import (
+    VenueBase,
+    VenueCreate,
+    VenueUpdate,
+    VenueResponse,
+    VenueListResponse
+)
 
 __all__ = [
-    "TourCreate",
-    "TourUpdate", 
-    "TourResponse",
-    "ConcertCreate",
-    "ConcertUpdate",
-    "ConcertResponse",
+    "VenueBase",
+    "VenueCreate", 
+    "VenueUpdate",
+    "VenueResponse",
+    "VenueListResponse"
 ]
