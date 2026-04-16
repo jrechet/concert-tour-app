@@ -1,41 +1,62 @@
-"""FastAPI application main module."""
+"""Concert Tour Management Application."""
+
+import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
-from .database import engine
-from .models import Base
-from .routers import tours
+from src.database import engine, Base
+from src.api.v1 import api_router
 
-# Create tables
-Base.metadata.create_all(bind=engine)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager."""
+    # Create database tables
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
+# Initialize FastAPI app
 app = FastAPI(
-    title="Concert Tour API",
-    description="API for managing concert tours and related data",
-    version="1.0.0"
+    title="Concert Tour Management",
+    description="API for managing concert tours, venues, and bookings",
+    version="1.0.0",
+    lifespan=lifespan
 )
 
-# CORS middleware
+# Configure CORS
+origins = ["http://localhost:3000"]  # Add your frontend URL
+if os.getenv("ENVIRONMENT") == "development":
+    origins.append("http://localhost:8000")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(tours.router)
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# Templates
+templates = Jinja2Templates(directory="templates")
 
-@app.get("/")
-def read_root():
-    """Root endpoint."""
-    return {"message": "Welcome to Concert Tour API"}
+# Include API routers
+app.include_router(api_router)
 
-
+# Basic health check
 @app.get("/health")
-def health_check():
+async def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
