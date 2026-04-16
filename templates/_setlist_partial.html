@@ -1,0 +1,56 @@
+<div class="setlist-container">
+    <div class="setlist">
+        <div class="setlist-header">
+            <h3>Current Setlist</h3>
+        </div>
+        <ul id="sortable-setlist" class="sortable-list" 
+            hx-post="{{ url_for('reorder_setlist', concert_id=concert.id) }}"
+            hx-trigger="end"
+            hx-swap="none">
+            {% if setlist_items %}
+                {% for item in setlist_items %}
+                    <li class="setlist-item" data-song-id="{{ item.song.id }}" data-position="{{ item.position }}">
+                        <div class="drag-handle"></div>
+                        <div class="song-info">
+                            <div class="song-title">{{ item.song.title }}</div>
+                            <div class="song-artist">{{ item.song.artist }}</div>
+                        </div>
+                        <div class="song-duration">{{ "%.1f"|format(item.song.duration) }}min</div>
+                        <button class="remove-btn" 
+                                hx-delete="{{ url_for('remove_from_setlist', concert_id=concert.id, song_id=item.song.id) }}"
+                                hx-target="#setlist-container"
+                                hx-confirm="Remove this song from setlist?">
+                            Remove
+                        </button>
+                    </li>
+                {% endfor %}
+            {% else %}
+                <div class="empty-setlist">
+                    <p>No songs in setlist yet</p>
+                    <p>Add songs from the library or clone from a previous concert</p>
+                </div>
+            {% endif %}
+        </ul>
+    </div>
+
+    <div class="song-library">
+        <h3>Song Library</h3>
+        <input type="text" class="search-box" placeholder="Search songs..." 
+               hx-get="{{ url_for('search_songs') }}"
+               hx-trigger="keyup changed delay:300ms"
+               hx-target="#song-results"
+               name="query">
+        
+        <ul id="song-results" class="song-list">
+            {% for song in available_songs %}
+                <li class="library-item" 
+                    hx-post="{{ url_for('add_to_setlist', concert_id=concert.id, song_id=song.id) }}"
+                    hx-target="#setlist-container"
+                    hx-swap="outerHTML">
+                    <div class="song-title">{{ song.title }}</div>
+                    <div class="song-artist">{{ song.artist }} • {{ "%.1f"|format(song.duration) }}min</div>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>

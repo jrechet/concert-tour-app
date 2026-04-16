@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setlist Management - {{ concert.title }}</title>
+    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #eee;
+        }
+        .concert-info h1 {
+            margin: 0;
+            color: #333;
+        }
+        .concert-info p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .duration-info {
+            text-align: right;
+        }
+        .total-duration {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c5aa0;
+        }
+        .song-count {
+            color: #666;
+            margin-top: 5px;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background-color: #2c5aa0;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #1e3d6f;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #545b62;
+        }
+        .setlist-container {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+        .setlist {
+            min-height: 400px;
+        }
+        .setlist-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .setlist-header h3 {
+            margin: 0;
+            color: #333;
+        }
+        .sortable-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            min-height: 50px;
+            border: 2px dashed #ddd;
+            border-radius: 5px;
+            padding: 10px;
+        }
+        .setlist-item {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            transition: all 0.2s;
+            cursor: move;
+        }
+        .setlist-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-color: #2c5aa0;
+        }
+        .setlist-item.sortable-ghost {
+            opacity: 0.4;
+        }
+        .setlist-item.sortable-drag {
+            opacity: 0.8;
+        }
+        .drag-handle {
+            width: 20px;
+            height: 20px;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23666" stroke-width="2"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>') no-repeat center;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        .song-info {
+            flex: 1;
+        }
+        .song-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .song-artist {
+            color: #666;
+            font-size: 14px;
+        }
+        .song-duration {
+            color: #2c5aa0;
+            font-weight: bold;
+            margin-left: 15px;
+        }
+        .remove-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 5px 8px;
+            cursor: pointer;
+            margin-left: 10px;
+            font-size: 12px;
+        }
+        .remove-btn:hover {
+            background: #c82333;
+        }
+        .song-library {
+            background: #f8f9fa;
+            border-radius: 5px;
+            padding: 15px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .search-box {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        .song-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .library-item {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .library-item:hover {
+            border-color: #2c5aa0;
+            background-color: #f0f7ff;
+        }
+        .library-item .song-title {
+            margin-bottom: 3px;
+        }
+        .library-item .song-artist {
+            font-size: 12px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 500px;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .close {
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover {
+            color: #999;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .empty-setlist {
+            text-align: center;
+            color: #666;
+            padding: 40px 20px;
+            border: 2px dashed #ddd;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="concert-info">
+                <h1>{{ concert.title }}</h1>
+                <p>{{ concert.venue }} • {{ concert.date.strftime('%B %d, %Y') if concert.date else 'Date TBD' }}</p>
+            </div>
+            <div class="duration-info">
+                <div class="total-duration" id="total-duration">
+                    {{ "%.0f"|format(total_duration) }} min
+                </div>
+                <div class="song-count" id="song-count">
+                    {{ setlist_items|length }} songs
+                </div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-primary" onclick="showCloneModal()">Clone from Previous Concert</button>
+            <a href="{{ url_for('concerts') }}" class="btn btn-secondary">Back to Concerts</a>
+        </div>
+
+        <div class="setlist-container">
+            <div class="setlist">
+                <div class="setlist-header">
+                    <h3>Current Setlist</h3>
+                </div>
+                <ul id="sortable-setlist" class="sortable-list" 
+                    hx-post="{{ url_for('reorder_setlist', concert_id=concert.id) }}"
+                    hx-trigger="end"
+                    hx-swap="none">
+                    {% if setlist_items %}
+                        {% for item in setlist_items %}
+                            <li class="setlist-item" data-song-id="{{ item.song.id }}" data-position="{{ item.position }}">
+                                <div class="drag-handle"></div>
+                                <div class="song-info">
+                                    <div class="song-title">{{ item.song.title }}</div>
+                                    <div class="song-artist">{{ item.song.artist }}</div>
+                                </div>
+                                <div class="song-duration">{{ "%.1f"|format(item.song.duration) }}min</div>
+                                <button class="remove-btn" 
+                                        hx-delete="{{ url_for('remove_from_setlist', concert_id=concert.id, song_id=item.song.id) }}"
+                                        hx-target="#setlist-container"
+                                        hx-confirm="Remove this song from setlist?">
+                                    Remove
+                                </button>
+                            </li>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-setlist">
+                            <p>No songs in setlist yet</p>
+                            <p>Add songs from the library or clone from a previous concert</p>
+                        </div>
+                    {% endif %}
+                </ul>
+            </div>
+
+            <div class="song-library">
+                <h3>Song Library</h3>
+                <input type="text" class="search-box" placeholder="Search songs..." 
+                       hx-get="{{ url_for('search_songs') }}"
+                       hx-trigger="keyup changed delay:300ms"
+                       hx-target="#song-results"
+                       name="query">
+                
+                <ul id="song-results" class="song-list">
+                    {% for song in available_songs %}
+                        <li class="library-item" 
+                            hx-post="{{ url_for('add_to_setlist', concert_id=concert.id, song_id=song.id) }}"
+                            hx-target="#setlist-container"
+                            hx-swap="outerHTML">
+                            <div class="song-title">{{ song.title }}</div>
+                            <div class="song-artist">{{ song.artist }} • {{ "%.1f"|format(song.duration) }}min</div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clone Setlist Modal -->
+    <div id="cloneModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Clone Setlist</h2>
+                <span class="close" onclick="hideCloneModal()">&times;</span>
+            </div>
+            <form hx-post="{{ url_for('clone_setlist', concert_id=concert.id) }}" 
+                  hx-target="#setlist-container">
+                <div class="form-group">
+                    <label for="source-concert">Select Concert to Clone From:</label>
+                    <select id="source-concert" name="source_concert_id" required>
+                        <option value="">Choose a concert...</option>
+                        {% for c in other_concerts %}
+                            <option value="{{ c.id }}">{{ c.title }} - {{ c.venue }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="text-align: right; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="hideCloneModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Clone Setlist</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Initialize SortableJS
+        const sortable = new Sortable(document.getElementById('sortable-setlist'), {
+            animation: 150,
+            handle: '.drag-handle',
+            ghostClass: 'sortable-ghost',
+            dragClass: 'sortable-drag',
+            onEnd: function(evt) {
+                // Update positions and trigger HTMX request
+                updatePositions();
+                
+                // Get the moved item and update total duration
+                updateDurationDisplay();
+            }
+        });
+
+        function updatePositions() {
+            const items = document.querySelectorAll('#sortable-setlist .setlist-item');
+            const positions = [];
+            
+            items.forEach((item, index) => {
+                const songId = item.dataset.songId;
+                positions.push({ song_id: songId, position: index + 1 });
+                item.dataset.position = index + 1;
+            });
+
+            // Send positions via HTMX
+            htmx.ajax('POST', '{{ url_for("reorder_setlist", concert_id=concert.id) }}', {
+                values: { positions: JSON.stringify(positions) }
+            });
+        }
+
+        function updateDurationDisplay() {
+            const items = document.querySelectorAll('#sortable-setlist .setlist-item .song-duration');
+            let totalMinutes = 0;
+            
+            items.forEach(item => {
+                const durationText = item.textContent.replace('min', '');
+                totalMinutes += parseFloat(durationText);
+            });
+            
+            document.getElementById('total-duration').textContent = Math.round(totalMinutes) + ' min';
+            document.getElementById('song-count').textContent = items.length + ' songs';
+        }
+
+        function showCloneModal() {
+            document.getElementById('cloneModal').style.display = 'block';
+        }
+
+        function hideCloneModal() {
+            document.getElementById('cloneModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('cloneModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Update duration display when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            updateDurationDisplay();
+        });
+
+        // Listen for HTMX events to update duration after adding/removing songs
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            if (evt.target.id === 'setlist-container') {
+                // Reinitialize sortable after content update
+                const newSortableList = document.getElementById('sortable-setlist');
+                if (newSortableList) {
+                    new Sortable(newSortableList, {
+                        animation: 150,
+                        handle: '.drag-handle',
+                        ghostClass: 'sortable-ghost',
+                        dragClass: 'sortable-drag',
+                        onEnd: function(evt) {
+                            updatePositions();
+                            updateDurationDisplay();
+                        }
+                    });
+                }
+                updateDurationDisplay();
+            }
+        });
+    </script>
+</body>
+</html>
