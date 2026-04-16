@@ -1,66 +1,41 @@
 """Test configuration and fixtures."""
 
 import pytest
-from app import create_app, db
-from models import Song, Setlist
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from src.main import app
+from src.database import get_db, Base
+
+SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///./test.db"
+engine = create_engine(
+    SQLALCHEMY_TEST_DATABASE_URL, connect_args={"check_same_thread": False}
+)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def override_get_db():
+    """Override database dependency for testing."""
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+app.dependency_overrides[get_db] = override_get_db
+
+
+@pytest.fixture(autouse=True)
+def setup_database():
+    """Create tables before each test, drop after."""
+    Base.metadata.create_all(bind=engine)
+    yield
+    Base.metadata.drop_all(bind=engine)
 
 
 @pytest.fixture
-def app():
-    """Create application for testing."""
-    app = create_app()
-    app.config.update({
-        "TESTING": True,
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-        "WTF_CSRF_ENABLED": False
-    })
-    
-    with app.app_context():
-        db.create_all()
-        yield app
-        db.drop_all()
-
-
-@pytest.fixture
-def client(app):
+def client():
     """Create test client."""
-    return app.test_client()
-
-
-@pytest.fixture
-def runner(app):
-    """Create test runner."""
-    return app.test_cli_runner()
-
-
-@pytest.fixture
-def sample_songs(app):
-    """Create sample songs for testing."""
-    songs = [
-        Song(title="Song One", artist="Artist A", duration=210),
-        Song(title="Song Two", artist="Artist B", duration=180),
-        Song(title="Song Three", artist="Artist C", duration=240),
-        Song(title="Song Four", artist="Artist A", duration=195),
-        Song(title="Song Five", artist="Artist D", duration=220),
-    ]
-    
-    for song in songs:
-        db.session.add(song)
-    db.session.commit()
-    
-    return songs
-
-
-@pytest.fixture
-def sample_setlist(app, sample_songs):
-    """Create a sample setlist for testing."""
-    setlist = Setlist(name="Test Setlist")
-    db.session.add(setlist)
-    db.session.flush()
-    
-    # Add first 3 songs to setlist
-    for i, song in enumerate(sample_songs[:3]):
-        setlist.add_song(song, order_position=i)
-    
-    db.session.commit()
-    return setlist
+    return TestClient(app)

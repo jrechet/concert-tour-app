@@ -1,6 +1,7 @@
 """FastAPI application main module."""
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from .database import engine
 from .models import Base
@@ -13,6 +14,15 @@ app = FastAPI(
     title="Concert Tour API",
     description="API for managing concert tours and related data",
     version="1.0.0"
+)
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Include routers

@@ -15,7 +15,8 @@ class TourCreate(BaseModel):
     start_date: date = Field(..., description="Tour start date")
     end_date: date = Field(..., description="Tour end date")
     description: Optional[str] = Field(None, max_length=1000, description="Tour description")
-    
+    status: Optional[str] = Field("planned", max_length=50, description="Tour status")
+
     @validator('end_date')
     def validate_end_date(cls, v, values):
         """Ensure end_date is not before start_date."""
@@ -44,7 +45,8 @@ class TourUpdate(BaseModel):
     start_date: Optional[date] = Field(None, description="Tour start date")
     end_date: Optional[date] = Field(None, description="Tour end date")
     description: Optional[str] = Field(None, max_length=1000, description="Tour description")
-    
+    status: Optional[str] = Field(None, max_length=50, description="Tour status")
+
     @validator('end_date')
     def validate_end_date(cls, v, values):
         """Ensure end_date is not before start_date if both are provided."""
@@ -72,7 +74,8 @@ class TourResponse(BaseModel):
     start_date: date = Field(..., description="Tour start date")
     end_date: date = Field(..., description="Tour end date")
     description: Optional[str] = Field(None, description="Tour description")
-    
+    status: Optional[str] = Field(None, description="Tour status")
+
     class Config:
         """Pydantic configuration."""
         orm_mode = True
