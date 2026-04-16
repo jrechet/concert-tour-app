@@ -1,6 +1,3 @@
-"""SQLAlchemy models package."""
+from .venue import Venue, Base
 
-from ..database import Base
-from .tour import Tour
-
-__all__ = ["Base", "Tour"]
+__all__ = ['Venue', 'Base']
