@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Concert Tour Management{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <h1 class="dashboard-title">Tour Dashboard</h1>
+    <p class="dashboard-subtitle">Manage your concerts, setlists, and venues from one central location</p>
+    
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+        <a href="{{ url_for('add_concert') }}" class="action-btn">
+            ➕ Add Concert
+        </a>
+        <a href="{{ url_for('view_setlist') }}" class="action-btn action-btn-secondary">
+            🎤 View Setlist
+        </a>
+        <a href="{{ url_for('add_venue') }}" class="action-btn action-btn-secondary">
+            🏛️ Add Venue
+        </a>
+    </div>
+</div>
+
+<!-- Dashboard Overview Cards -->
+<div class="dashboard-grid">
+    <!-- Concert Stats Card -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Concert Overview</h2>
+            <span class="card-icon">🎪</span>
+        </div>
+        <div class="card-content">
+            <div class="card-stats">
+                <div class="stat-item">
+                    <span class="stat-value">{{ upcoming_concerts|length }}</span>
+                    <span class="stat-label">Upcoming</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">{{ total_concerts }}</span>
+                    <span class="stat-label">Total</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">{{ venues|length }}</span>
+                    <span class="stat-label">Venues</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity Card -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Recent Activity</h2>
+            <span class="card-icon">📊</span>
+        </div>
+        <div class="card-content">
+            {% if recent_concerts %}
+                {% for concert in recent_concerts[:3] %}
+                <div style="margin-bottom: 0.75rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-muted);">
+                    <div style="font-weight: 600; color: var(--text-primary);">{{ concert.venue.name }}</div>
+                    <div style="font-size: 0.875rem; color: var(--text-muted);">{{ concert.date.strftime('%B %d, %Y') }}</div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state" style="padding: 1rem 0;">
+                    <div class="empty-state-title" style="font-size: 1rem;">No recent activity</div>
+                    <div class="empty-state-text" style="font-size: 0.875rem;">Add your first concert to get started</div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Setlist Stats Card -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Setlist Overview</h2>
+            <span class="card-icon">🎵</span>
+        </div>
+        <div class="card-content">
+            <div class="card-stats">
+                <div class="stat-item">
+                    <span class="stat-value">{{ setlists|length }}</span>
+                    <span class="stat-label">Setlists</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">{{ total_songs }}</span>
+                    <span class="stat-label">Songs</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">{{ avg_setlist_duration|round|int }}</span>
+                    <span class="stat-label">Avg Duration</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upcoming Concerts Table -->
+{% if upcoming_concerts %}
+<div class="table-container">
+    <div class="table-header">
+        <h2 class="table-title">Upcoming Concerts</h2>
+    </div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Venue</th>
+                <th>Location</th>
+                <th>Status</th>
+                <th>Setlist</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for concert in upcoming_concerts %}
+            <tr>
+                <td>{{ concert.date.strftime('%m/%d/%Y') }}</td>
+                <td>{{ concert.venue.name }}</td>
+                <td>{{ concert.venue.city }}, {{ concert.venue.state }}</td>
+                <td>
+                    <span class="status-badge upcoming">Upcoming</span>
+                </td>
+                <td>
+                    {% if concert.setlist %}
+                        <a href="{{ url_for('view_setlist', id=concert.setlist.id) }}" style="color: var(--accent-primary);">View Setlist</a>
+                    {% else %}
+                        <span style="color: var(--text-muted);">Not assigned</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card">
+    <div class="empty-state">
+        <div class="empty-state-icon">🎪</div>
+        <div class="empty-state-title">No upcoming concerts</div>
+        <div class="empty-state-text">Schedule your first concert to see it here</div>
+        <a href="{{ url_for('add_concert') }}" class="action-btn">Add Concert</a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Setlists - Concert Tour Management{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <h1 class="dashboard-title">Setlists</h1>
+    <p class="dashboard-subtitle">Manage your performance setlists</p>
+    
+    <div class="quick-actions">
+        <a href="#" class="action-btn">
+            ➕ Create Setlist
+        </a>
+    </div>
+</div>
+
+{% if setlists %}
+<div class="dashboard-grid">
+    {% for setlist in setlists %}
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">{{ setlist.name }}</h2>
+            <span class="card-icon">🎵</span>
+        </div>
+        <div class="card-content">
+            <p style="margin-bottom: 1rem; color: var(--text-secondary);">
+                {{ setlist.songs|length }} songs
+                {% if setlist.total_duration() > 0 %}
+                    • {{ (setlist.total_duration() / 60)|round|int }} minutes
+                {% endif %}
+            </p>
+            <div class="card-stats">
+                <div class="stat-item">
+                    <span class="stat-value">{{ setlist.songs|length }}</span>
+                    <span class="stat-label">Songs</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">{{ (setlist.total_duration() / 60)|round|int }}</span>
+                    <span class="stat-label">Minutes</span>
+                </div>
+            </div>
+            <div style="margin-top: 1rem;">
+                <a href="{{ url_for('view_setlist', setlist_id=setlist.id) }}" class="action-btn action-btn-secondary" style="font-size: 0.875rem; padding: 0.5rem 1rem;">
+                    View Details
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <div class="empty-state">
+        <div class="empty-state-icon">🎵</div>
+        <div class="empty-state-title">No setlists created</div>
+        <div class="empty-state-text">Create your first setlist to organize your performances</div>
+        <a href="#" class="action-btn">Create Setlist</a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

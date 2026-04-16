@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Concert Tour Management{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="{{ url_for('dashboard') }}" class="nav-brand">
+                🎵 TourManager
+            </a>
+            <ul class="nav-links">
+                <li><a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a></li>
+                <li><a href="{{ url_for('concerts') }}" class="nav-link {% if request.endpoint == 'concerts' %}active{% endif %}">Concerts</a></li>
+                <li><a href="{{ url_for('setlists') }}" class="nav-link {% if request.endpoint == 'setlists' %}active{% endif %}">Setlists</a></li>
+                <li><a href="{{ url_for('venues') }}" class="nav-link {% if request.endpoint == 'venues' %}active{% endif %}">Venues</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main content -->
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
