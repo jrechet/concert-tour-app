@@ -1,41 +1,39 @@
-"""FastAPI application main module."""
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+import logging
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-from .database import engine
-from .models import Base
-from .routers import tours
+app = FastAPI(title="Concert Tour App")
 
-# Create tables
-Base.metadata.create_all(bind=engine)
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-app = FastAPI(
-    title="Concert Tour API",
-    description="API for managing concert tours and related data",
-    version="1.0.0"
-)
+# Set up templates
+templates = Jinja2Templates(directory="templates")
 
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    """Home page route"""
+    try:
+        return templates.TemplateResponse("index.html", {"request": request})
+    except Exception as e:
+        logger.error(f"Error rendering home page: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
-# Include routers
-app.include_router(tours.router)
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request):
+    """Dashboard page route"""
+    try:
+        return templates.TemplateResponse("dashboard.html", {"request": request})
+    except Exception as e:
+        logger.error(f"Error rendering dashboard page: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
-
-@app.get("/")
-def read_root():
-    """Root endpoint."""
-    return {"message": "Welcome to Concert Tour API"}
-
-
-@app.get("/health")
-def health_check():
-    """Health check endpoint."""
-    return {"status": "healthy"}
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
