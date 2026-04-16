@@ -1,31 +1,35 @@
-"""FastAPI application main module."""
-
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-from .database import engine
-from .models import Base
-from .routers import tours
+from .routers import venues, concerts, songs, setlists
+from .database import engine, Base
 
-# Create tables
+# Create database tables
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(
-    title="Concert Tour API",
-    description="API for managing concert tours and related data",
-    version="1.0.0"
+app = FastAPI(title="Concert Tour API", version="1.0.0")
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Include routers
-app.include_router(tours.router)
+app.include_router(venues.router, tags=["venues"])
+app.include_router(concerts.router, tags=["concerts"])
+app.include_router(songs.router, tags=["songs"])
+app.include_router(setlists.router, tags=["setlists"])
 
 
 @app.get("/")
 def read_root():
-    """Root endpoint."""
-    return {"message": "Welcome to Concert Tour API"}
+    return {"message": "Concert Tour API"}
 
 
 @app.get("/health")
 def health_check():
-    """Health check endpoint."""
     return {"status": "healthy"}
