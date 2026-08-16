@@ -131,4 +131,7 @@ dmypy.json
 # Project specific
 concert_tour.db
 *.db
+*.db-journal
+*.db-wal
+*.db-shm
 .DS_Store
