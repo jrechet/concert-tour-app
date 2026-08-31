@@ -28,3 +28,35 @@ def test_dashboard_does_not_embed_business_data(client):
     """The shell must not hardcode tour/concert data — that's loaded via HTMX."""
     response = client.get("/dashboard")
     assert "hx-get" in response.text
+
+
+def test_dashboard_contains_calendar_grid_shell(client):
+    response = client.get("/dashboard")
+    assert 'id="calendar-grid"' in response.text
+
+
+def test_dashboard_contains_stat_card_placeholders(client):
+    response = client.get("/dashboard")
+    for stat_id in ("stat-concerts", "stat-cities", "stat-countries", "stat-capacity", "stat-revenue"):
+        assert f'id="{stat_id}"' in response.text
+
+
+def test_dashboard_quick_actions_do_not_link_to_invented_routes(client):
+    """No concert-create or setlist route exists on `main` yet, so the quick
+    action buttons must not point at invented URLs — they're rendered
+    disabled until those routes exist."""
+    response = client.get("/dashboard")
+    assert 'id="quick-action-add-concert"' in response.text
+    assert 'id="quick-action-view-setlist"' in response.text
+    assert 'aria-disabled="true"' in response.text
+
+
+def test_dashboard_links_dark_theme_stylesheet(client):
+    response = client.get("/dashboard")
+    assert "dashboard.css" in response.text
+
+
+def test_dashboard_stylesheet_is_served(client):
+    response = client.get("/static/css/dashboard.css")
+    assert response.status_code == 200
+    assert "--color-bg" in response.text
