@@ -2,28 +2,89 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Concert Tour Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/dashboard.css') }}">
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
 </head>
 <body>
-    <header>
-        <h1>Concert Tour Dashboard</h1>
-    </header>
+    <div class="dashboard">
+        <header class="dashboard-header">
+            <h1>Concert Tour Dashboard</h1>
 
-    <main>
-        <section id="stats-cards" aria-label="Tour statistics"
-                 hx-get="/api/v1/dashboard/stats"
-                 hx-trigger="load"
-                 hx-swap="innerHTML">
-            <!-- Stats cards are loaded client-side via HTMX -->
-        </section>
+            <!--
+                No concert-create or setlist page/route exists on `main` yet:
+                only the JSON `/api/v1/tours/` API and unused Concert schemas
+                are implemented, there is no Concert router, setlist model,
+                or any HTML page for either. Rather than invent URLs, these
+                actions are rendered disabled until those routes land.
+            -->
+            <div class="quick-actions" aria-label="Quick actions">
+                <a id="quick-action-add-concert"
+                   class="btn btn-primary is-disabled"
+                   href="#"
+                   role="button"
+                   aria-disabled="true"
+                   tabindex="-1"
+                   title="Not yet available: no concert-create route exists on main">
+                    Add Concert
+                </a>
+                <a id="quick-action-view-setlist"
+                   class="btn btn-secondary is-disabled"
+                   href="#"
+                   role="button"
+                   aria-disabled="true"
+                   tabindex="-1"
+                   title="Not yet available: no setlist route exists on main">
+                    View Setlist
+                </a>
+            </div>
+        </header>
 
-        <section id="tour-overview" aria-label="Tour overview"
-                 hx-get="/api/v1/dashboard/tours"
-                 hx-trigger="load"
-                 hx-swap="innerHTML">
-            <!-- Tour overview is loaded client-side via HTMX -->
-        </section>
-    </main>
+        <main class="dashboard-main">
+            <section id="tour-overview" class="card tour-overview" aria-label="Tour overview"
+                     hx-get="/api/v1/dashboard/tours"
+                     hx-trigger="load"
+                     hx-swap="innerHTML">
+                <div id="tour-name" class="tour-name">Loading tour&hellip;</div>
+                <div id="tour-dates" class="tour-dates"></div>
+                <div id="tour-progress" class="tour-progress">
+                    <div class="progress-bar">
+                        <div class="progress-bar-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="stats-cards" class="stats-grid" aria-label="Tour statistics"
+                     hx-get="/api/v1/dashboard/stats"
+                     hx-trigger="load"
+                     hx-swap="innerHTML">
+                <div id="stat-concerts" class="stat-card">
+                    <span class="stat-label">Concerts</span>
+                    <span class="stat-value">&mdash;</span>
+                </div>
+                <div id="stat-cities" class="stat-card">
+                    <span class="stat-label">Cities</span>
+                    <span class="stat-value">&mdash;</span>
+                </div>
+                <div id="stat-countries" class="stat-card">
+                    <span class="stat-label">Countries</span>
+                    <span class="stat-value">&mdash;</span>
+                </div>
+                <div id="stat-capacity" class="stat-card">
+                    <span class="stat-label">Total Capacity</span>
+                    <span class="stat-value">&mdash;</span>
+                </div>
+                <div id="stat-revenue" class="stat-card">
+                    <span class="stat-label">Projected Revenue</span>
+                    <span class="stat-value">&mdash;</span>
+                </div>
+            </section>
+
+            <section id="calendar-grid" class="calendar-grid" aria-label="Concert calendar">
+                <!-- Empty shell: populated by a later task -->
+            </section>
+        </main>
+    </div>
 </body>
 </html>
