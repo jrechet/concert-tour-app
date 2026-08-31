@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Concert Tour Dashboard</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+<body>
+    <header>
+        <h1>Concert Tour Dashboard</h1>
+    </header>
+
+    <main>
+        <section id="stats-cards" aria-label="Tour statistics"
+                 hx-get="/api/v1/dashboard/stats"
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
+            <!-- Stats cards are loaded client-side via HTMX -->
+        </section>
+
+        <section id="tour-overview" aria-label="Tour overview"
+                 hx-get="/api/v1/dashboard/tours"
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
+            <!-- Tour overview is loaded client-side via HTMX -->
+        </section>
+    </main>
+</body>
+</html>
