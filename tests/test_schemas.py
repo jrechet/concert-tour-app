@@ -13,7 +13,7 @@ from src.schemas.concert import ConcertCreate, ConcertUpdate, ConcertResponse
 
 class TestTourSchemas:
     """Test cases for Tour schemas."""
-    
+
     def test_tour_create_valid(self):
         """Test valid tour creation schema."""
         tour_data = {
@@ -29,7 +29,7 @@ class TestTourSchemas:
         assert tour.start_date == date(2024, 6, 1)
         assert tour.end_date == date(2024, 12, 31)
         assert tour.description == "An amazing world tour"
-    
+
     def test_tour_create_without_description(self):
         """Test tour creation without optional description."""
         tour_data = {
@@ -40,7 +40,7 @@ class TestTourSchemas:
         }
         tour = TourCreate(**tour_data)
         assert tour.description is None
-    
+
     def test_tour_create_end_date_before_start_date(self):
         """Test validation error when end_date is before start_date."""
         tour_data = {
@@ -52,7 +52,7 @@ class TestTourSchemas:
         with pytest.raises(ValidationError) as exc_info:
             TourCreate(**tour_data)
         assert "end_date must be after or equal to start_date" in str(exc_info.value)
-    
+
     def test_tour_create_empty_name(self):
         """Test validation error for empty name."""
         tour_data = {
@@ -63,7 +63,7 @@ class TestTourSchemas:
         }
         with pytest.raises(ValidationError):
             TourCreate(**tour_data)
-    
+
     def test_tour_update_partial(self):
         """Test partial tour update schema."""
         update_data = {
@@ -72,7 +72,7 @@ class TestTourSchemas:
         tour_update = TourUpdate(**update_data)
         assert tour_update.name == "Updated Tour Name"
         assert tour_update.artist is None
-    
+
     def test_tour_response(self):
         """Test tour response schema."""
         tour_data = {
@@ -90,7 +90,7 @@ class TestTourSchemas:
 
 class TestConcertSchemas:
     """Test cases for Concert schemas."""
-    
+
     def test_concert_create_valid(self):
         """Test valid concert creation schema."""
         future_date = datetime.now() + timedelta(days=30)
@@ -108,7 +108,7 @@ class TestConcertSchemas:
         assert concert.venue == "Madison Square Garden"
         assert concert.ticket_price == Decimal("150.00")
         assert concert.capacity == 20000
-    
+
     def test_concert_create_without_optional_fields(self):
         """Test concert creation without optional fields."""
         future_date = datetime.now() + timedelta(days=30)
@@ -122,7 +122,7 @@ class TestConcertSchemas:
         concert = ConcertCreate(**concert_data)
         assert concert.ticket_price is None
         assert concert.capacity is None
-    
+
     def test_concert_create_past_date(self):
         """Test validation error for past concert date."""
         past_date = datetime.now() - timedelta(days=1)
@@ -136,7 +136,7 @@ class TestConcertSchemas:
         with pytest.raises(ValidationError) as exc_info:
             ConcertCreate(**concert_data)
         assert "Concert date must be in the future" in str(exc_info.value)
-    
+
     def test_concert_create_negative_price(self):
         """Test validation error for negative ticket price."""
         future_date = datetime.now() + timedelta(days=30)
@@ -150,7 +150,7 @@ class TestConcertSchemas:
         }
         with pytest.raises(ValidationError):
             ConcertCreate(**concert_data)
-    
+
     def test_concert_create_invalid_tour_id(self):
         """Test validation error for invalid tour_id."""
         future_date = datetime.now() + timedelta(days=30)
@@ -163,7 +163,7 @@ class TestConcertSchemas:
         }
         with pytest.raises(ValidationError):
             ConcertCreate(**concert_data)
-    
+
     def test_concert_update_partial(self):
         """Test partial concert update schema."""
         update_data = {
@@ -174,7 +174,7 @@ class TestConcertSchemas:
         assert concert_update.venue == "Updated Venue"
         assert concert_update.ticket_price == Decimal("175.00")
         assert concert_update.city is None
-    
+
     def test_concert_response(self):
         """Test concert response schema."""
         concert_data = {
@@ -185,7 +185,8 @@ class TestConcertSchemas:
             "ticket_price": Decimal("150.00"),
             "tickets_sold": 15000,
             "remaining_tickets": 5000,
-            "sold_out": False
+            "sold_out": False,
+            "is_almost_sold_out": False
         }
         concert_response = ConcertResponse(**concert_data)
         assert concert_response.id == 1
@@ -193,6 +194,7 @@ class TestConcertSchemas:
         assert concert_response.venue_id == 1
         assert concert_response.remaining_tickets == 5000
         assert concert_response.sold_out is False
+        assert concert_response.is_almost_sold_out is False
 
     def test_concert_response_sold_out(self):
         """A concert with zero remaining tickets reports sold_out=True."""
@@ -204,11 +206,13 @@ class TestConcertSchemas:
             "ticket_price": Decimal("150.00"),
             "tickets_sold": 20000,
             "remaining_tickets": 0,
-            "sold_out": True
+            "sold_out": True,
+            "is_almost_sold_out": True
         }
         concert_response = ConcertResponse(**concert_data)
         assert concert_response.remaining_tickets == 0
         assert concert_response.sold_out is True
+        assert concert_response.is_almost_sold_out is True
 
     def test_concert_response_unknown_capacity(self):
         """remaining_tickets is null when the venue has no known capacity."""
@@ -220,10 +224,12 @@ class TestConcertSchemas:
             "ticket_price": None,
             "tickets_sold": 0,
             "remaining_tickets": None,
-            "sold_out": False
+            "sold_out": False,
+            "is_almost_sold_out": False
         }
         concert_response = ConcertResponse(**concert_data)
         assert concert_response.remaining_tickets is None
+        assert concert_response.is_almost_sold_out is False
 
     def test_concert_create_ignores_remaining_tickets_and_sold_out(self):
         """remaining_tickets/sold_out are derived, read-only values and must

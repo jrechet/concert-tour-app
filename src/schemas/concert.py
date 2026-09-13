@@ -73,10 +73,10 @@ class ConcertResponse(BaseModel):
     """Schema for concert API responses.
 
     Field names mirror the actual `Concert` model (a `venue_id` foreign
-    key, not a free-text venue/city/country trio). `remaining_tickets` and
-    `sold_out` are derived read-only properties computed from the linked
-    venue's capacity and `tickets_sold` — they are never accepted as input
-    on `ConcertCreate`/`ConcertUpdate`.
+    key, not a free-text venue/city/country trio). `remaining_tickets`,
+    `sold_out`, and `is_almost_sold_out` are derived read-only properties
+    computed from the linked venue's capacity and `tickets_sold` — they are
+    never accepted as input on `ConcertCreate`/`ConcertUpdate`.
     """
 
     id: int = Field(..., description="Unique concert identifier")
@@ -89,6 +89,9 @@ class ConcertResponse(BaseModel):
         None, description="Tickets still available; null when the venue's capacity is unknown"
     )
     sold_out: bool = Field(..., description="Whether every ticket for this concert has been sold")
+    is_almost_sold_out: bool = Field(
+        ..., description="Whether fewer than the configured threshold of tickets remain"
+    )
 
     class Config:
         """Pydantic configuration."""
@@ -102,6 +105,7 @@ class ConcertResponse(BaseModel):
                 "ticket_price": "150.00",
                 "tickets_sold": 15000,
                 "remaining_tickets": 5000,
-                "sold_out": False
+                "sold_out": False,
+                "is_almost_sold_out": True
             }
         }
