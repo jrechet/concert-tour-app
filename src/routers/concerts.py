@@ -2,14 +2,15 @@
 dashboard concert-card fragments."""
 
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
-from ..models import Concert
+from ..models import Concert, Venue
 from ..schemas import ConcertResponse
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
@@ -23,18 +24,24 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 def get_concerts(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
+    city: Optional[str] = Query(
+        None, description="Filter concerts to a single venue city (case-insensitive exact match)"
+    ),
     db: Session = Depends(get_db)
 ):
     """Retrieve all concerts with pagination, including remaining ticket
-    counts and sold-out status derived from each concert's venue."""
-    concerts = (
-        db.query(Concert)
-        .options(joinedload(Concert.venue))
-        .order_by(Concert.id)
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    counts and sold-out status derived from each concert's venue.
+
+    When `city` is provided, results are narrowed to concerts whose venue
+    is in that city (case-insensitive exact match) before pagination is
+    applied.
+    """
+    query = db.query(Concert).options(joinedload(Concert.venue)).order_by(Concert.id)
+
+    if city is not None:
+        query = query.join(Concert.venue).filter(func.lower(Venue.city) == city.lower())
+
+    concerts = query.offset(skip).limit(limit).all()
     return concerts
 
 
