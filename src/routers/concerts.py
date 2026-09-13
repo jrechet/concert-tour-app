@@ -10,8 +10,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
-from ..models import Concert, Venue
-from ..schemas import ConcertResponse
+from ..models import Concert, LineupEntry, Venue
+from ..schemas import ConcertResponse, LineupEntryResponse
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
 api_router = APIRouter(prefix="/api/v1/concerts", tags=["concerts"])
@@ -57,6 +57,34 @@ def get_concert(concert_id: int, db: Session = Depends(get_db)):
     if not concert:
         raise HTTPException(status_code=404, detail="Concert not found")
     return concert
+
+
+@api_router.get("/{concert_id}/lineup", response_model=List[LineupEntryResponse])
+def get_concert_lineup(
+    concert_id: int,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    db: Session = Depends(get_db),
+):
+    """Retrieve the supporting-act lineup for a concert, in running order
+    (ascending `set_order`), with pagination.
+
+    Returns 404 when the concert itself doesn't exist, but an empty list
+    (not an error) when the concert exists and simply has no lineup entries.
+    """
+    concert_exists = db.query(Concert.id).filter(Concert.id == concert_id).first()
+    if not concert_exists:
+        raise HTTPException(status_code=404, detail="Concert not found")
+
+    entries = (
+        db.query(LineupEntry)
+        .filter(LineupEntry.concert_id == concert_id)
+        .order_by(LineupEntry.set_order)
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return entries
 
 
 @router.get("/concerts")
