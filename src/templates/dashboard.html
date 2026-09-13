@@ -81,8 +81,10 @@
                 </div>
             </section>
 
-            <section id="calendar-grid" class="calendar-grid" aria-label="Concert calendar">
-                <!-- Empty shell: populated by a later task -->
+            <section id="calendar-grid" class="calendar-grid" aria-label="Concert calendar"
+                     hx-get="/api/v1/dashboard/concerts"
+                     hx-trigger="load"
+                     hx-swap="innerHTML">
             </section>
         </main>
     </div>

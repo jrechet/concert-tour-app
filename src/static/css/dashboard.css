@@ -188,12 +188,67 @@ a {
   font-weight: 700;
 }
 
-/* Calendar grid shell */
+/* Calendar grid / concert cards */
 .calendar-grid {
   min-height: 400px;
-  border: 2px dashed var(--color-border);
   border-radius: var(--radius-lg);
   background-color: var(--color-surface);
+}
+
+.calendar-grid:empty {
+  border: 2px dashed var(--color-border);
+}
+
+.concert-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+}
+
+.concert-card {
+  background-color: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.concert-card-date {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.concert-card-venue {
+  font-weight: 600;
+}
+
+.ticket-count {
+  color: var(--color-accent-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.ticket-badge {
+  align-self: flex-start;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ticket-badge-sold-out {
+  background-color: var(--color-danger);
+  color: var(--color-bg);
+}
+
+.concert-cards-empty {
+  padding: var(--spacing-lg);
+  color: var(--color-text-secondary);
+  text-align: center;
 }
 
 /* Tablet breakpoint */
