@@ -33,6 +33,7 @@ app.add_middleware(
 # Include routers
 app.include_router(tours.router)
 app.include_router(concerts.router)
+app.include_router(concerts.api_router)
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
