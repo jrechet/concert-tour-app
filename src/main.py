@@ -2,14 +2,15 @@
 
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session, joinedload
 
-from .database import engine
-from .models import Base
+from .database import engine, get_db
+from .models import Base, Concert
 from .routers import concerts, tours
 
 # Create tables
@@ -56,3 +57,22 @@ def health_check():
 def read_dashboard(request: Request):
     """Render the dashboard shell; all data is loaded client-side via HTMX."""
     return templates.TemplateResponse(request, "dashboard.html")
+
+
+@app.get("/concerts/{concert_id}", response_class=HTMLResponse)
+def read_concert_detail(concert_id: int, request: Request, db: Session = Depends(get_db)):
+    """Render the concert detail page: the headliner plus the supporting-act
+    lineup in running order (or an empty-state message when none exist)."""
+    concert = (
+        db.query(Concert)
+        .options(
+            joinedload(Concert.tour),
+            joinedload(Concert.venue),
+            joinedload(Concert.lineup),
+        )
+        .filter(Concert.id == concert_id)
+        .first()
+    )
+    if not concert:
+        raise HTTPException(status_code=404, detail="Concert not found")
+    return templates.TemplateResponse(request, "concert_detail.html", {"concert": concert})
