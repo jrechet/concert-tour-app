@@ -180,14 +180,76 @@ class TestConcertSchemas:
         concert_data = {
             "id": 1,
             "tour_id": 1,
-            "venue": "Madison Square Garden",
-            "city": "New York",
-            "country": "USA",
+            "venue_id": 1,
             "date_time": datetime(2024, 7, 15, 20, 0, 0),
             "ticket_price": Decimal("150.00"),
-            "capacity": 20000
+            "tickets_sold": 15000,
+            "remaining_tickets": 5000,
+            "sold_out": False
         }
         concert_response = ConcertResponse(**concert_data)
         assert concert_response.id == 1
         assert concert_response.tour_id == 1
-        assert concert_response.venue == "Madison Square Garden"
+        assert concert_response.venue_id == 1
+        assert concert_response.remaining_tickets == 5000
+        assert concert_response.sold_out is False
+
+    def test_concert_response_sold_out(self):
+        """A concert with zero remaining tickets reports sold_out=True."""
+        concert_data = {
+            "id": 2,
+            "tour_id": 1,
+            "venue_id": 1,
+            "date_time": datetime(2024, 7, 15, 20, 0, 0),
+            "ticket_price": Decimal("150.00"),
+            "tickets_sold": 20000,
+            "remaining_tickets": 0,
+            "sold_out": True
+        }
+        concert_response = ConcertResponse(**concert_data)
+        assert concert_response.remaining_tickets == 0
+        assert concert_response.sold_out is True
+
+    def test_concert_response_unknown_capacity(self):
+        """remaining_tickets is null when the venue has no known capacity."""
+        concert_data = {
+            "id": 3,
+            "tour_id": 1,
+            "venue_id": 1,
+            "date_time": datetime(2024, 7, 15, 20, 0, 0),
+            "ticket_price": None,
+            "tickets_sold": 0,
+            "remaining_tickets": None,
+            "sold_out": False
+        }
+        concert_response = ConcertResponse(**concert_data)
+        assert concert_response.remaining_tickets is None
+
+    def test_concert_create_ignores_remaining_tickets_and_sold_out(self):
+        """remaining_tickets/sold_out are derived, read-only values and must
+        not be settable on the create schema."""
+        future_date = datetime.now() + timedelta(days=30)
+        concert_data = {
+            "tour_id": 1,
+            "venue": "Madison Square Garden",
+            "city": "New York",
+            "country": "USA",
+            "date_time": future_date,
+            "remaining_tickets": 999,
+            "sold_out": True
+        }
+        concert = ConcertCreate(**concert_data)
+        assert not hasattr(concert, "remaining_tickets")
+        assert not hasattr(concert, "sold_out")
+
+    def test_concert_update_ignores_remaining_tickets_and_sold_out(self):
+        """Same guarantee as create: the update schema has no way to set
+        these derived fields."""
+        update_data = {
+            "venue": "Updated Venue",
+            "remaining_tickets": 0,
+            "sold_out": True
+        }
+        concert_update = ConcertUpdate(**update_data)
+        assert not hasattr(concert_update, "remaining_tickets")
+        assert not hasattr(concert_update, "sold_out")
