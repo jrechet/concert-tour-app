@@ -38,11 +38,11 @@ def test_concert_detail_renders_supporting_acts_in_running_order(client, db_sess
     concert = _build_concert(db_session)
     db_session.add_all([
         LineupEntry(
-            concert_id=concert.id, artist_name="Second Opener", running_order=2,
+            concert_id=concert.id, artist_name="Second Opener", set_order=2,
             set_time=datetime(2026, 10, 1, 19, 30, 0),
         ),
         LineupEntry(
-            concert_id=concert.id, artist_name="First Opener", running_order=1,
+            concert_id=concert.id, artist_name="First Opener", set_order=1,
             set_time=datetime(2026, 10, 1, 18, 30, 0),
         ),
     ])
@@ -73,7 +73,7 @@ def test_concert_detail_escapes_artist_names(client, db_session):
         LineupEntry(
             concert_id=concert.id,
             artist_name="<script>alert('xss')</script>",
-            running_order=1,
+            set_order=1,
         )
     )
     db_session.commit()

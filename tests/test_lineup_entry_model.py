@@ -1,7 +1,9 @@
-"""Tests for the LineupEntry model: ordering, optional set_time, and
-cascade deletion when the parent concert is removed."""
+"""Tests for the LineupEntry model: ordering, optional set_time, set_order
+validation, and cascade deletion when the parent concert is removed."""
 
 from datetime import datetime, timedelta
+
+import pytest
 
 from src.models import LineupEntry
 from tests.fixtures.dashboard_fixtures import create_concert, create_tour, create_venues
@@ -29,12 +31,12 @@ def test_lineup_is_empty_by_default(db_session):
     assert concert.lineup == []
 
 
-def test_lineup_entries_are_ordered_by_running_order_not_insertion_order(db_session):
+def test_lineup_entries_are_ordered_by_set_order_not_insertion_order(db_session):
     concert = _build_concert(db_session)
     db_session.add_all([
-        LineupEntry(concert_id=concert.id, artist_name="Plays Third", running_order=3),
-        LineupEntry(concert_id=concert.id, artist_name="Plays First", running_order=1),
-        LineupEntry(concert_id=concert.id, artist_name="Plays Second", running_order=2),
+        LineupEntry(concert_id=concert.id, artist_name="Plays Third", set_order=3),
+        LineupEntry(concert_id=concert.id, artist_name="Plays First", set_order=1),
+        LineupEntry(concert_id=concert.id, artist_name="Plays Second", set_order=2),
     ])
     db_session.commit()
     db_session.refresh(concert)
@@ -46,7 +48,7 @@ def test_lineup_entries_are_ordered_by_running_order_not_insertion_order(db_sess
 
 def test_lineup_entry_set_time_is_optional(db_session):
     concert = _build_concert(db_session)
-    entry = LineupEntry(concert_id=concert.id, artist_name="No Set Time Yet", running_order=1)
+    entry = LineupEntry(concert_id=concert.id, artist_name="No Set Time Yet", set_order=1)
     db_session.add(entry)
     db_session.commit()
     db_session.refresh(entry)
@@ -54,9 +56,40 @@ def test_lineup_entry_set_time_is_optional(db_session):
     assert entry.set_time is None
 
 
+def test_negative_set_order_is_rejected(db_session):
+    concert = _build_concert(db_session)
+
+    with pytest.raises(ValueError):
+        LineupEntry(concert_id=concert.id, artist_name="Bad Order", set_order=-1)
+
+
+def test_duplicate_set_order_within_same_concert_is_rejected(db_session):
+    concert = _build_concert(db_session)
+    db_session.add(LineupEntry(concert_id=concert.id, artist_name="First Opener", set_order=1))
+    db_session.commit()
+
+    db_session.add(LineupEntry(concert_id=concert.id, artist_name="Second Opener", set_order=1))
+    with pytest.raises(ValueError):
+        db_session.commit()
+    db_session.rollback()
+
+
+def test_duplicate_set_order_is_allowed_across_different_concerts(db_session):
+    concert_a = _build_concert(db_session)
+    concert_b = _build_concert(db_session)
+    db_session.add_all([
+        LineupEntry(concert_id=concert_a.id, artist_name="Opener A", set_order=1),
+        LineupEntry(concert_id=concert_b.id, artist_name="Opener B", set_order=1),
+    ])
+    db_session.commit()
+
+    assert len(concert_a.lineup) == 1
+    assert len(concert_b.lineup) == 1
+
+
 def test_deleting_concert_cascades_to_lineup_entries(db_session):
     concert = _build_concert(db_session)
-    db_session.add(LineupEntry(concert_id=concert.id, artist_name="Opener", running_order=1))
+    db_session.add(LineupEntry(concert_id=concert.id, artist_name="Opener", set_order=1))
     db_session.commit()
     concert_id = concert.id
 

@@ -1,9 +1,14 @@
 """Database configuration and session management."""
 
+import os
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///concert_tour.db"
+# Overridable so the Alembic migration environment (migrations/env.py) and
+# any non-default deployment can point at a different database without a
+# code change.
+SQLALCHEMY_DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///concert_tour.db")
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
