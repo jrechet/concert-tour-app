@@ -16,6 +16,24 @@ class Concert(Base):
     venue_id = Column(Integer, ForeignKey("venues.id"), nullable=False, index=True)
     date_time = Column(DateTime, nullable=False)
     ticket_price = Column(Numeric(10, 2), nullable=True)
+    tickets_sold = Column(Integer, nullable=False, default=0)
 
     tour = relationship("Tour", backref="concerts")
     venue = relationship("Venue", backref="concerts")
+
+    @property
+    def remaining_tickets(self):
+        """Tickets still available, derived from the venue's capacity.
+
+        Returns None when the venue has no known capacity, since remaining
+        count can't be computed without it.
+        """
+        if self.venue is None or self.venue.capacity is None:
+            return None
+        return max(self.venue.capacity - (self.tickets_sold or 0), 0)
+
+    @property
+    def sold_out(self):
+        """Whether every ticket for this concert has been sold."""
+        remaining = self.remaining_tickets
+        return remaining is not None and remaining <= 0

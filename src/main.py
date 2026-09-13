@@ -10,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 
 from .database import engine
 from .models import Base
-from .routers import tours
+from .routers import concerts, tours
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -32,6 +32,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(tours.router)
+app.include_router(concerts.router)
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))

@@ -1,0 +1,9 @@
+{% if concerts %}
+<div class="concert-cards" role="list">
+    {% for concert in concerts %}
+    {% include "_concert_card.html" %}
+    {% endfor %}
+</div>
+{% else %}
+<p class="concert-cards-empty">No concerts scheduled yet.</p>
+{% endif %}

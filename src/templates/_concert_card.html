@@ -1,0 +1,9 @@
+<article class="concert-card">
+    <div class="concert-card-date">{{ concert.date_time.strftime('%b %d, %Y') }}</div>
+    <div class="concert-card-venue">{{ concert.venue.name|e }}, {{ concert.venue.city|e }}</div>
+    {% if concert.sold_out %}
+    <span class="ticket-badge ticket-badge-sold-out" role="status">Sold Out</span>
+    {% elif concert.remaining_tickets is not none %}
+    <span class="ticket-count">{{ concert.remaining_tickets }} tickets left</span>
+    {% endif %}
+</article>
