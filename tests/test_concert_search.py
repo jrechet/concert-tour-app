@@ -9,11 +9,18 @@ the full list on a blank query, and the no-match empty state.
 
 from datetime import datetime, timedelta
 
-from tests.fixtures.dashboard_fixtures import create_concert, create_tour, create_venues
+from src.models import Venue
+from tests.fixtures.dashboard_fixtures import create_concert, create_tour
 
 
 def _seed_tour_with_artist(db_session, artist, name=None):
-    """A tour (with its own dedicated venue) for a specific artist, real FKs throughout."""
+    """A tour with its own dedicated (uniquely-named) venue for a specific
+    artist, real FKs throughout.
+
+    Builds the venue directly rather than via `create_venues`, which always
+    returns the same leading slice of its template list — reusing it across
+    multiple artists in one test would give every venue an identical name.
+    """
     tour = create_tour(
         db_session,
         name=name or f"{artist} Tour",
@@ -22,7 +29,10 @@ def _seed_tour_with_artist(db_session, artist, name=None):
         end_date=(datetime.now() + timedelta(days=90)).date(),
         status="active",
     )
-    venue = create_venues(db_session, count=1)[0]
+    venue = Venue(name=f"{artist} Arena", city="Testville", country="USA", capacity=5000)
+    db_session.add(venue)
+    db_session.commit()
+    db_session.refresh(venue)
     return tour, venue
 
 
