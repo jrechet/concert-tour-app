@@ -10,7 +10,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
-from ..models import Concert, LineupEntry, Venue
+from ..models import Concert, LineupEntry, Tour, Venue
 from ..schemas import ConcertResponse, LineupEntryResponse
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
@@ -27,6 +27,9 @@ def get_concerts(
     city: Optional[str] = Query(
         None, description="Filter concerts to a single venue city (case-insensitive exact match)"
     ),
+    artist_name: Optional[str] = Query(
+        None, description="Filter concerts to tours whose artist name contains this text (case-insensitive)"
+    ),
     db: Session = Depends(get_db)
 ):
     """Retrieve all concerts with pagination, including remaining ticket
@@ -34,12 +37,17 @@ def get_concerts(
 
     When `city` is provided, results are narrowed to concerts whose venue
     is in that city (case-insensitive exact match) before pagination is
-    applied.
+    applied. When `artist_name` is provided, results are narrowed to
+    concerts whose tour artist name contains that text (case-insensitive
+    substring match) before pagination is applied.
     """
     query = db.query(Concert).options(joinedload(Concert.venue)).order_by(Concert.id)
 
     if city is not None:
         query = query.join(Concert.venue).filter(func.lower(Venue.city) == city.lower())
+
+    if artist_name is not None:
+        query = query.join(Concert.tour).filter(func.lower(Tour.artist).contains(artist_name.lower()))
 
     concerts = query.offset(skip).limit(limit).all()
     return concerts
