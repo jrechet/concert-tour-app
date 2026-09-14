@@ -33,6 +33,20 @@ def _seed_multi_city_tour(db_session, venue_count=3, name="Multi-City E2E Tour")
     return tour, venues
 
 
+def _seed_tour_with_artist(db_session, artist, name=None):
+    """A tour (with its own dedicated venue) for a specific artist, real FKs throughout."""
+    tour = create_tour(
+        db_session,
+        name=name or f"{artist} Tour",
+        artist=artist,
+        start_date=(datetime.now() - timedelta(days=1)).date(),
+        end_date=(datetime.now() + timedelta(days=90)).date(),
+        status="active",
+    )
+    venue = create_venues(db_session, count=1)[0]
+    return tour, venue
+
+
 def test_get_concerts_includes_remaining_tickets_and_sold_out(client, db_session):
     """Every concert in the list response carries the derived fields."""
     tour, venue = _seed_tour_and_venue(db_session)
@@ -319,3 +333,105 @@ class TestCityFilterEndToEnd:
         response = client.get(f"/api/v1/concerts/?city={target.city}&skip=3&limit=5")
         assert response.status_code == 200
         assert response.json() == []
+
+
+class TestArtistNameFilterEndToEnd:
+    """Coverage for the `artist_name` filter on the concerts list endpoint:
+    exact/mixed-case matching, partial substring matching, no-match empty
+    results, and interaction with pagination."""
+
+    def test_exact_case_match_returns_expected_concerts(self, client, db_session):
+        """An exact-case artist_name query returns only that artist's concerts."""
+        tour, venue = _seed_tour_with_artist(db_session, "Aurora Belle")
+        create_concert(
+            db_session, tour, venue, day_offset=1, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=0,
+        )
+        other_tour, other_venue = _seed_tour_with_artist(db_session, "River Stone")
+        create_concert(
+            db_session, other_tour, other_venue, day_offset=2, ticket_price="60.00",
+            base_time=datetime.now(), tickets_sold=0,
+        )
+
+        response = client.get("/api/v1/concerts/?artist_name=Aurora Belle")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["tour_id"] == tour.id
+
+    def test_mixed_case_query_matches_case_insensitively(self, client, db_session):
+        """A query in the opposite/mixed case still matches the artist."""
+        tour, venue = _seed_tour_with_artist(db_session, "Aurora Belle")
+        create_concert(
+            db_session, tour, venue, day_offset=1, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=0,
+        )
+
+        response = client.get("/api/v1/concerts/?artist_name=aURORA bELLE")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["tour_id"] == tour.id
+
+    def test_partial_substring_query_matches(self, client, db_session):
+        """A substring of the artist name matches concerts for that artist."""
+        tour, venue = _seed_tour_with_artist(db_session, "The Midnight Collective")
+        create_concert(
+            db_session, tour, venue, day_offset=1, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=0,
+        )
+        other_tour, other_venue = _seed_tour_with_artist(db_session, "River Stone")
+        create_concert(
+            db_session, other_tour, other_venue, day_offset=2, ticket_price="60.00",
+            base_time=datetime.now(), tickets_sold=0,
+        )
+
+        response = client.get("/api/v1/concerts/?artist_name=Midnight")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["tour_id"] == tour.id
+
+    def test_query_with_no_matches_returns_empty_list(self, client, db_session):
+        """An artist name with no matches returns an empty list, not an error."""
+        tour, venue = _seed_tour_with_artist(db_session, "Aurora Belle")
+        create_concert(
+            db_session, tour, venue, day_offset=1, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=0,
+        )
+
+        response = client.get("/api/v1/concerts/?artist_name=Nonexistent Artist")
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_filter_combined_with_pagination_uses_filtered_subset(self, client, db_session):
+        """skip/limit apply to the artist_name-filtered subset, not the
+        unfiltered total."""
+        tour, venue = _seed_tour_with_artist(db_session, "Aurora Belle")
+        base_time = datetime.now()
+        for i in range(3):
+            create_concert(
+                db_session, tour, venue, day_offset=i, ticket_price="50.00",
+                base_time=base_time, tickets_sold=0,
+            )
+        other_tour, other_venue = _seed_tour_with_artist(db_session, "River Stone")
+        for i in range(5):
+            create_concert(
+                db_session, other_tour, other_venue, day_offset=10 + i, ticket_price="60.00",
+                base_time=base_time, tickets_sold=0,
+            )
+
+        # 8 concerts total, but only 3 belong to "Aurora Belle". skip=1,
+        # limit=5 against the filtered subset should yield exactly 2 results,
+        # and the total filtered count (checked via an unpaginated request)
+        # should be exactly 3.
+        unpaginated = client.get("/api/v1/concerts/?artist_name=Aurora Belle")
+        assert unpaginated.status_code == 200
+        assert len(unpaginated.json()) == 3
+
+        response = client.get("/api/v1/concerts/?artist_name=Aurora Belle&skip=1&limit=5")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 2
+        for concert in data:
+            assert concert["tour_id"] == tour.id
