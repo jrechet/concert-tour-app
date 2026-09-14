@@ -81,6 +81,21 @@
                 </div>
             </section>
 
+            <div id="concert-search" class="concert-search" role="search">
+                <label for="artist-search-input" class="concert-search-label">Search by artist</label>
+                <input type="search"
+                       id="artist-search-input"
+                       name="artist_name"
+                       class="concert-search-input"
+                       placeholder="Search by artist name&hellip;"
+                       autocomplete="off"
+                       aria-label="Search concerts by artist name"
+                       hx-get="/api/v1/dashboard/concerts"
+                       hx-trigger="keyup changed delay:300ms, search"
+                       hx-target="#calendar-grid"
+                       hx-swap="innerHTML">
+            </div>
+
             <section id="calendar-grid" class="calendar-grid" aria-label="Concert calendar"
                      hx-get="/api/v1/dashboard/concerts"
                      hx-trigger="load"
