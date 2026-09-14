@@ -188,6 +188,34 @@ a {
   font-weight: 700;
 }
 
+/* Concert search */
+.concert-search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.concert-search-label {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.concert-search-input {
+  width: 100%;
+  max-width: 360px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-base);
+}
+
+.concert-search-input:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
 /* Calendar grid / concert cards */
 .calendar-grid {
   min-height: 400px;
@@ -281,6 +309,10 @@ a {
 
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .concert-search-input {
+    max-width: none;
   }
 
   .calendar-grid {

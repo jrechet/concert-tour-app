@@ -96,14 +96,26 @@ def get_concert_lineup(
 
 
 @router.get("/concerts")
-def get_dashboard_concerts(request: Request, db: Session = Depends(get_db)):
-    """Render concert cards showing date, venue, and ticket availability."""
-    concerts = (
-        db.query(Concert)
-        .options(joinedload(Concert.venue))
-        .order_by(Concert.date_time)
-        .all()
-    )
+def get_dashboard_concerts(
+    request: Request,
+    artist_name: Optional[str] = Query(
+        None, description="Filter concerts to tours whose artist name contains this text (case-insensitive)"
+    ),
+    db: Session = Depends(get_db),
+):
+    """Render concert cards showing date, venue, and ticket availability.
+
+    When `artist_name` is provided and non-blank, results are narrowed to
+    concerts whose tour artist name contains that text (case-insensitive
+    substring match). A blank value — e.g. a cleared search box — is
+    treated the same as omitting the filter, restoring the full list.
+    """
+    query = db.query(Concert).options(joinedload(Concert.venue)).order_by(Concert.date_time)
+
+    if artist_name:
+        query = query.join(Concert.tour).filter(func.lower(Tour.artist).contains(artist_name.lower()))
+
+    concerts = query.all()
     return templates.TemplateResponse(
         request, "dashboard_concerts.html", {"concerts": concerts}
     )
