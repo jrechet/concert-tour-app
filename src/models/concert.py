@@ -1,6 +1,6 @@
 """SQLAlchemy model for Concert entity."""
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Numeric, String, event
 from sqlalchemy.orm import relationship, validates
 
 from ..config import ALMOST_SOLD_OUT_THRESHOLD
@@ -69,3 +69,19 @@ class Concert(Base):
         if remaining is None:
             return False
         return (remaining / capacity) < ALMOST_SOLD_OUT_THRESHOLD
+
+
+@event.listens_for(Concert, "before_insert")
+@event.listens_for(Concert, "before_update")
+def _enforce_cancellation_consistency(mapper, connection, target):
+    """Keep `is_cancelled`/`cancellation_reason` consistent on every flush.
+
+    Checked at flush time (rather than via `@validates` on the individual
+    columns) so the rule holds no matter which of the two attributes was
+    set first, or whether `cancellation_reason` was ever touched at all.
+    """
+    if target.is_cancelled:
+        if not target.cancellation_reason or not target.cancellation_reason.strip():
+            raise ValueError("cancellation_reason must be a non-empty string when is_cancelled is True")
+    else:
+        target.cancellation_reason = None
