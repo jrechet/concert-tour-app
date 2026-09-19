@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
 from ..models import Concert, LineupEntry, Tour, Venue
-from ..schemas import ConcertResponse, LineupEntryResponse
+from ..schemas import CancelConcertRequest, ConcertResponse, LineupEntryResponse
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
 api_router = APIRouter(prefix="/api/v1/concerts", tags=["concerts"])
@@ -30,6 +30,9 @@ def get_concerts(
     artist_name: Optional[str] = Query(
         None, description="Filter concerts to tours whose artist name contains this text (case-insensitive)"
     ),
+    include_cancelled: bool = Query(
+        True, description="When false, cancelled concerts are excluded from the results"
+    ),
     db: Session = Depends(get_db)
 ):
     """Retrieve all concerts with pagination, including remaining ticket
@@ -39,7 +42,9 @@ def get_concerts(
     is in that city (case-insensitive exact match) before pagination is
     applied. When `artist_name` is provided, results are narrowed to
     concerts whose tour artist name contains that text (case-insensitive
-    substring match) before pagination is applied.
+    substring match) before pagination is applied. When `include_cancelled`
+    is false, cancelled concerts are excluded before pagination is applied;
+    it defaults to true so existing clients see no change in behavior.
     """
     query = db.query(Concert).options(joinedload(Concert.venue)).order_by(Concert.id)
 
@@ -48,6 +53,9 @@ def get_concerts(
 
     if artist_name is not None:
         query = query.join(Concert.tour).filter(func.lower(Tour.artist).contains(artist_name.lower()))
+
+    if not include_cancelled:
+        query = query.filter(Concert.is_cancelled.is_(False))
 
     concerts = query.offset(skip).limit(limit).all()
     return concerts
@@ -64,6 +72,46 @@ def get_concert(concert_id: int, db: Session = Depends(get_db)):
     )
     if not concert:
         raise HTTPException(status_code=404, detail="Concert not found")
+    return concert
+
+
+@api_router.post("/{concert_id}/cancel", response_model=ConcertResponse)
+def cancel_concert(concert_id: int, payload: CancelConcertRequest, db: Session = Depends(get_db)):
+    """Cancel a concert, recording the reason.
+
+    Returns 404 for an unknown concert and 409 if the concert is already
+    cancelled.
+    """
+    concert = db.query(Concert).filter(Concert.id == concert_id).first()
+    if not concert:
+        raise HTTPException(status_code=404, detail="Concert not found")
+    if concert.is_cancelled:
+        raise HTTPException(status_code=409, detail="Concert is already cancelled")
+
+    concert.is_cancelled = True
+    concert.cancellation_reason = payload.reason
+    db.commit()
+    db.refresh(concert)
+    return concert
+
+
+@api_router.post("/{concert_id}/uncancel", response_model=ConcertResponse)
+def uncancel_concert(concert_id: int, db: Session = Depends(get_db)):
+    """Restore a cancelled concert, clearing the cancellation reason.
+
+    Returns 404 for an unknown concert and 409 if the concert is not
+    currently cancelled.
+    """
+    concert = db.query(Concert).filter(Concert.id == concert_id).first()
+    if not concert:
+        raise HTTPException(status_code=404, detail="Concert not found")
+    if not concert.is_cancelled:
+        raise HTTPException(status_code=409, detail="Concert is not cancelled")
+
+    concert.is_cancelled = False
+    concert.cancellation_reason = None
+    db.commit()
+    db.refresh(concert)
     return concert
 
 
