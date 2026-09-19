@@ -1,6 +1,6 @@
 """SQLAlchemy model for Concert entity."""
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import relationship, validates
 
 from ..config import ALMOST_SOLD_OUT_THRESHOLD
@@ -18,6 +18,8 @@ class Concert(Base):
     date_time = Column(DateTime, nullable=False)
     ticket_price = Column(Numeric(10, 2), nullable=True)
     tickets_sold = Column(Integer, nullable=False, default=0)
+    is_cancelled = Column(Boolean, nullable=False, default=False, server_default="0")
+    cancellation_reason = Column(String(500), nullable=True)
 
     tour = relationship("Tour", backref="concerts")
     venue = relationship("Venue", backref="concerts")

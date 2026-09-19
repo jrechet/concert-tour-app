@@ -55,7 +55,10 @@ def create_tour(db_session, name, artist, start_date, end_date, status, descript
     return tour
 
 
-def create_concert(db_session, tour, venue, day_offset, ticket_price, base_time, tickets_sold=0):
+def create_concert(
+    db_session, tour, venue, day_offset, ticket_price, base_time, tickets_sold=0,
+    is_cancelled=False, cancellation_reason=None,
+):
     """Persist and return a `Concert` linked to a real tour and venue via FK."""
     concert = Concert(
         tour_id=tour.id,
@@ -63,6 +66,8 @@ def create_concert(db_session, tour, venue, day_offset, ticket_price, base_time,
         date_time=base_time + timedelta(days=day_offset),
         ticket_price=Decimal(ticket_price),
         tickets_sold=tickets_sold,
+        is_cancelled=is_cancelled,
+        cancellation_reason=cancellation_reason,
     )
     db_session.add(concert)
     db_session.commit()

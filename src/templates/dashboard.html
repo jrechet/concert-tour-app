@@ -92,8 +92,21 @@
                        aria-label="Search concerts by artist name"
                        hx-get="/api/v1/dashboard/concerts"
                        hx-trigger="keyup changed delay:300ms, search"
+                       hx-include="#hide-cancelled-checkbox"
                        hx-target="#calendar-grid"
                        hx-swap="innerHTML">
+                <label class="concert-hide-cancelled-label">
+                    <input type="checkbox"
+                           id="hide-cancelled-checkbox"
+                           name="include_cancelled"
+                           value="false"
+                           hx-get="/api/v1/dashboard/concerts"
+                           hx-trigger="change"
+                           hx-include="#artist-search-input"
+                           hx-target="#calendar-grid"
+                           hx-swap="innerHTML">
+                    Masquer les dates annulées
+                </label>
             </div>
 
             <section id="calendar-grid" class="calendar-grid" aria-label="Concert calendar"

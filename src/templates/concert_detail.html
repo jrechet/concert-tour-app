@@ -7,7 +7,15 @@
 <body>
 <article class="concert-detail">
     <header class="concert-detail-header">
-        <h1 class="concert-detail-headliner">{{ concert.tour.artist|e }}</h1>
+        <h1 class="concert-detail-headliner">
+            {{ concert.tour.artist|e }}
+            {% if concert.is_cancelled %}
+            <span class="cancellation-badge" role="status">Annulé</span>
+            {% endif %}
+        </h1>
+        {% if concert.is_cancelled and concert.cancellation_reason %}
+        <p class="cancellation-reason">{{ concert.cancellation_reason|e }}</p>
+        {% endif %}
         <p class="concert-detail-venue">{{ concert.venue.name|e }}, {{ concert.venue.city|e }}</p>
         <p class="concert-detail-date">{{ concert.date_time.strftime('%b %d, %Y %I:%M %p') }}</p>
     </header>

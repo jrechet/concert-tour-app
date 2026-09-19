@@ -101,6 +101,9 @@ def get_dashboard_concerts(
     artist_name: Optional[str] = Query(
         None, description="Filter concerts to tours whose artist name contains this text (case-insensitive)"
     ),
+    include_cancelled: bool = Query(
+        True, description="When false, cancelled concerts are excluded from the results"
+    ),
     db: Session = Depends(get_db),
 ):
     """Render concert cards showing date, venue, and ticket availability.
@@ -109,11 +112,18 @@ def get_dashboard_concerts(
     concerts whose tour artist name contains that text (case-insensitive
     substring match). A blank value — e.g. a cleared search box — is
     treated the same as omitting the filter, restoring the full list.
+
+    When `include_cancelled` is false, cancelled concerts are excluded.
+    Defaults to true so the list shows everything unless the caller opts
+    into hiding cancelled dates.
     """
     query = db.query(Concert).options(joinedload(Concert.venue)).order_by(Concert.date_time)
 
     if artist_name:
         query = query.join(Concert.tour).filter(func.lower(Tour.artist).contains(artist_name.lower()))
+
+    if not include_cancelled:
+        query = query.filter(Concert.is_cancelled.is_(False))
 
     concerts = query.all()
     return templates.TemplateResponse(

@@ -92,6 +92,10 @@ class ConcertResponse(BaseModel):
     is_almost_sold_out: bool = Field(
         ..., description="Whether fewer than the configured threshold of tickets remain"
     )
+    is_cancelled: bool = Field(..., description="Whether this concert has been cancelled")
+    cancellation_reason: Optional[str] = Field(
+        None, description="Free-text reason for cancellation; null when the concert is not cancelled"
+    )
 
     class Config:
         """Pydantic configuration."""
@@ -106,6 +110,8 @@ class ConcertResponse(BaseModel):
                 "tickets_sold": 15000,
                 "remaining_tickets": 5000,
                 "sold_out": False,
-                "is_almost_sold_out": True
+                "is_almost_sold_out": True,
+                "is_cancelled": False,
+                "cancellation_reason": None
             }
         }
