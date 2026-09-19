@@ -1,0 +1,8 @@
+# How this project shows itself when the swarm demos a cycle.
+# Without this, QA guesses: "/", "/docs", "/health" plus one page per
+# router — which on this app are JSON responses, so the demo card showed
+# payloads instead of the dashboard the feature actually changed.
+demo:
+  pages:
+    - "/dashboard"
+    - "/"
