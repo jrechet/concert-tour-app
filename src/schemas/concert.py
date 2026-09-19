@@ -69,6 +69,29 @@ class ConcertUpdate(BaseModel):
         }
 
 
+class CancelConcertRequest(BaseModel):
+    """Schema for the request body of the cancel-concert endpoint."""
+
+    reason: str = Field(..., min_length=1, description="Reason for cancelling the concert")
+
+    @validator("reason")
+    def validate_reason_not_blank(cls, v):
+        """Reject a reason that is only whitespace, and trim surrounding
+        whitespace from valid ones."""
+        trimmed = v.strip()
+        if not trimmed:
+            raise ValueError("reason must not be blank")
+        return trimmed
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "reason": "Artist illness",
+            }
+        }
+
+
 class ConcertResponse(BaseModel):
     """Schema for concert API responses.
 
