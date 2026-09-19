@@ -186,7 +186,8 @@ class TestConcertSchemas:
             "tickets_sold": 15000,
             "remaining_tickets": 5000,
             "sold_out": False,
-            "is_almost_sold_out": False
+            "is_almost_sold_out": False,
+            "is_cancelled": False
         }
         concert_response = ConcertResponse(**concert_data)
         assert concert_response.id == 1
@@ -207,7 +208,8 @@ class TestConcertSchemas:
             "tickets_sold": 20000,
             "remaining_tickets": 0,
             "sold_out": True,
-            "is_almost_sold_out": True
+            "is_almost_sold_out": True,
+            "is_cancelled": False
         }
         concert_response = ConcertResponse(**concert_data)
         assert concert_response.remaining_tickets == 0
@@ -225,7 +227,8 @@ class TestConcertSchemas:
             "tickets_sold": 0,
             "remaining_tickets": None,
             "sold_out": False,
-            "is_almost_sold_out": False
+            "is_almost_sold_out": False,
+            "is_cancelled": False
         }
         concert_response = ConcertResponse(**concert_data)
         assert concert_response.remaining_tickets is None
