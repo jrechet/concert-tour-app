@@ -435,3 +435,95 @@ class TestArtistNameFilterEndToEnd:
         assert len(data) == 2
         for concert in data:
             assert concert["tour_id"] == tour.id
+
+
+class TestRemainingTicketsField:
+    """Dedicated coverage for `remaining_tickets`: no sales, partial sales,
+    fully sold out, and the oversold clamp-to-zero edge case, verified on
+    both the detail endpoint and across a paginated list."""
+
+    def test_no_tickets_sold_remaining_equals_capacity(self, client, db_session):
+        tour, venue = _seed_tour_and_venue(db_session)
+        concert = create_concert(
+            db_session, tour, venue, day_offset=1, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=0,
+        )
+
+        detail = client.get(f"/api/v1/concerts/{concert.id}")
+        assert detail.status_code == 200
+        assert detail.json()["remaining_tickets"] == venue.capacity
+        assert detail.json()["sold_out"] is False
+
+        listing = client.get("/api/v1/concerts/")
+        assert listing.json()[0]["remaining_tickets"] == venue.capacity
+
+    def test_partial_sales_remaining_is_capacity_minus_sold(self, client, db_session):
+        tour, venue = _seed_tour_and_venue(db_session)
+        sold = venue.capacity // 3
+        concert = create_concert(
+            db_session, tour, venue, day_offset=1, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=sold,
+        )
+
+        detail = client.get(f"/api/v1/concerts/{concert.id}")
+        assert detail.json()["remaining_tickets"] == venue.capacity - sold
+        assert detail.json()["sold_out"] is False
+
+        listing = client.get("/api/v1/concerts/")
+        assert listing.json()[0]["remaining_tickets"] == venue.capacity - sold
+
+    def test_fully_sold_out_remaining_is_zero(self, client, db_session):
+        tour, venue = _seed_tour_and_venue(db_session)
+        concert = create_concert(
+            db_session, tour, venue, day_offset=1, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=venue.capacity,
+        )
+
+        detail = client.get(f"/api/v1/concerts/{concert.id}")
+        assert detail.json()["remaining_tickets"] == 0
+        assert detail.json()["sold_out"] is True
+
+        listing = client.get("/api/v1/concerts/")
+        assert listing.json()[0]["remaining_tickets"] == 0
+        assert listing.json()[0]["sold_out"] is True
+
+    def test_oversold_remaining_clamps_to_zero_not_negative(self, client, db_session):
+        """tickets_sold can end up above capacity (e.g. a venue's listed
+        capacity is revised down after tickets were already sold).
+        remaining_tickets must clamp to 0 rather than reporting a negative
+        count."""
+        tour, venue = _seed_tour_and_venue(db_session)
+        concert = create_concert(
+            db_session, tour, venue, day_offset=1, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=venue.capacity + 250,
+        )
+
+        detail = client.get(f"/api/v1/concerts/{concert.id}")
+        assert detail.status_code == 200
+        assert detail.json()["remaining_tickets"] == 0
+        assert detail.json()["sold_out"] is True
+
+        listing = client.get("/api/v1/concerts/")
+        assert listing.json()[0]["remaining_tickets"] == 0
+
+    def test_remaining_tickets_correct_per_item_across_paginated_list(self, client, db_session):
+        """Each page of results carries the correct remaining_tickets for
+        its own concert, not just a presence check."""
+        tour, venue = _seed_tour_and_venue(db_session)
+        base_time = datetime.now()
+        sold_counts = [0, 10, venue.capacity, venue.capacity + 100]
+        for i, sold in enumerate(sold_counts):
+            create_concert(
+                db_session, tour, venue, day_offset=i, ticket_price="50.00",
+                base_time=base_time, tickets_sold=sold,
+            )
+
+        expected = [venue.capacity, venue.capacity - 10, 0, 0]
+
+        first_page = client.get("/api/v1/concerts/?skip=0&limit=2")
+        assert first_page.status_code == 200
+        assert [c["remaining_tickets"] for c in first_page.json()] == expected[:2]
+
+        second_page = client.get("/api/v1/concerts/?skip=2&limit=2")
+        assert second_page.status_code == 200
+        assert [c["remaining_tickets"] for c in second_page.json()] == expected[2:]
