@@ -25,7 +25,7 @@ def get_concerts(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     city: Optional[str] = Query(
-        None, description="Filter concerts to a single venue city (case-insensitive exact match)"
+        None, description="Filter concerts to venues whose city contains this text (case-insensitive)"
     ),
     artist_name: Optional[str] = Query(
         None, description="Filter concerts to tours whose artist name contains this text (case-insensitive)"
@@ -38,9 +38,10 @@ def get_concerts(
     """Retrieve all concerts with pagination, including remaining ticket
     counts and sold-out status derived from each concert's venue.
 
-    When `city` is provided, results are narrowed to concerts whose venue
-    is in that city (case-insensitive exact match) before pagination is
-    applied. When `artist_name` is provided, results are narrowed to
+    When `city` is provided and non-blank, results are narrowed to concerts
+    whose venue city contains that text (case-insensitive substring match)
+    before pagination is applied; a blank value is treated the same as
+    omitting the filter. When `artist_name` is provided, results are narrowed to
     concerts whose tour artist name contains that text (case-insensitive
     substring match) before pagination is applied. When `include_cancelled`
     is false, cancelled concerts are excluded before pagination is applied;
@@ -48,8 +49,10 @@ def get_concerts(
     """
     query = db.query(Concert).options(joinedload(Concert.venue)).order_by(Concert.id)
 
-    if city is not None:
-        query = query.join(Concert.venue).filter(func.lower(Venue.city) == city.lower())
+    if city:
+        query = query.join(Concert.venue).filter(
+            func.lower(Venue.city).contains(city.lower(), autoescape=True)
+        )
 
     if artist_name is not None:
         query = query.join(Concert.tour).filter(func.lower(Tour.artist).contains(artist_name.lower()))
