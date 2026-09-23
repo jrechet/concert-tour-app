@@ -79,6 +79,21 @@ def get_concerts(
     return concerts
 
 
+@api_router.get("/cities", response_model=List[str])
+def get_concert_cities(db: Session = Depends(get_db)):
+    """Retrieve the distinct list of cities hosting at least one concert,
+    sorted alphabetically, for populating a city filter control.
+    """
+    rows = (
+        db.query(Venue.city)
+        .join(Concert, Concert.venue_id == Venue.id)
+        .distinct()
+        .order_by(Venue.city)
+        .all()
+    )
+    return [row[0] for row in rows]
+
+
 @api_router.get("/{concert_id}", response_model=ConcertResponse)
 def get_concert(concert_id: int, db: Session = Depends(get_db)):
     """Retrieve a specific concert by ID."""
