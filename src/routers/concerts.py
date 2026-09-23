@@ -94,6 +94,27 @@ def get_concert_cities(db: Session = Depends(get_db)):
     return [row[0] for row in rows]
 
 
+@api_router.get("/upcoming", response_model=List[ConcertResponse])
+def get_upcoming_concerts(
+    db: Session = Depends(get_db),
+    reference_time: datetime = Depends(get_reference_time),
+):
+    """Retrieve concerts scheduled today or later, ordered soonest first.
+
+    A concert is upcoming when its calendar date (compared against
+    `reference_time`) is today or in the future; past concerts are
+    excluded entirely rather than appended, unlike `GET /`.
+    """
+    concerts = (
+        db.query(Concert)
+        .options(joinedload(Concert.venue))
+        .filter(func.date(Concert.date_time) >= func.date(reference_time))
+        .order_by(Concert.date_time)
+        .all()
+    )
+    return concerts
+
+
 @api_router.get("/{concert_id}", response_model=ConcertResponse)
 def get_concert(concert_id: int, db: Session = Depends(get_db)):
     """Retrieve a specific concert by ID."""
