@@ -6,6 +6,7 @@ from decimal import Decimal
 
 from sqlalchemy import event
 
+from src.models import Venue
 from tests.conftest import engine
 from tests.fixtures.dashboard_fixtures import create_concert, create_tour, create_venues
 
@@ -352,6 +353,125 @@ class TestCityFilterEndToEnd:
             )
 
         response = client.get(f"/api/v1/concerts/?city={target.city}&skip=3&limit=5")
+        assert response.status_code == 200
+        assert response.json() == []
+
+
+class TestCityFilterSqlSafetyAndEdgeCases:
+    """Coverage for city values containing characters with special meaning
+    in SQL LIKE patterns (`%`, `_`) or string literals (quotes), and for
+    mixed-case multi-word city names, confirming the filter is
+    parameterized and treats these values as plain literals rather than
+    interpreting them as SQL syntax."""
+
+    def test_mixed_case_multi_word_city_matches(self, client, db_session):
+        """A mixed-case, all-lowercase query for a multi-word city name
+        ("New York") still matches."""
+        tour, venue = _seed_tour_and_venue(db_session)  # venue.city == "New York"
+        create_concert(
+            db_session, tour, venue, day_offset=1, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=0,
+        )
+
+        response = client.get("/api/v1/concerts/", params={"city": "new york"})
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["venue_id"] == venue.id
+
+    def test_city_filter_treats_percent_character_as_literal(self, client, db_session):
+        """A city value containing `%` is matched literally, not as a SQL
+        LIKE wildcard that would incorrectly also match unrelated cities."""
+        tour = create_tour(
+            db_session, name="Percent City Tour", artist="Test Artist",
+            start_date=(datetime.now() - timedelta(days=1)).date(),
+            end_date=(datetime.now() + timedelta(days=90)).date(),
+            status="active",
+        )
+        percent_venue = Venue(name="Percent Arena", city="50% City", country="USA", capacity=5000)
+        other_venue = Venue(name="Other Arena", city="50X City", country="USA", capacity=5000)
+        db_session.add_all([percent_venue, other_venue])
+        db_session.commit()
+        db_session.refresh(percent_venue)
+        db_session.refresh(other_venue)
+        base_time = datetime.now()
+        create_concert(
+            db_session, tour, percent_venue, day_offset=1, ticket_price="50.00",
+            base_time=base_time, tickets_sold=0,
+        )
+        create_concert(
+            db_session, tour, other_venue, day_offset=2, ticket_price="50.00",
+            base_time=base_time, tickets_sold=0,
+        )
+
+        response = client.get("/api/v1/concerts/", params={"city": "50% City"})
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["venue_id"] == percent_venue.id
+
+    def test_city_filter_treats_underscore_character_as_literal(self, client, db_session):
+        """A city value containing `_` is matched literally, not as a SQL
+        LIKE single-character wildcard that would incorrectly also match
+        unrelated cities."""
+        tour = create_tour(
+            db_session, name="Underscore City Tour", artist="Test Artist",
+            start_date=(datetime.now() - timedelta(days=1)).date(),
+            end_date=(datetime.now() + timedelta(days=90)).date(),
+            status="active",
+        )
+        underscore_venue = Venue(name="Underscore Arena", city="Spring_field", country="USA", capacity=5000)
+        other_venue = Venue(name="Other Arena", city="SpringXfield", country="USA", capacity=5000)
+        db_session.add_all([underscore_venue, other_venue])
+        db_session.commit()
+        db_session.refresh(underscore_venue)
+        db_session.refresh(other_venue)
+        base_time = datetime.now()
+        create_concert(
+            db_session, tour, underscore_venue, day_offset=1, ticket_price="50.00",
+            base_time=base_time, tickets_sold=0,
+        )
+        create_concert(
+            db_session, tour, other_venue, day_offset=2, ticket_price="50.00",
+            base_time=base_time, tickets_sold=0,
+        )
+
+        response = client.get("/api/v1/concerts/", params={"city": "Spring_field"})
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["venue_id"] == underscore_venue.id
+
+    def test_city_filter_handles_quote_character_without_error(self, client, db_session):
+        """A city value containing a single quote is handled safely by the
+        parameterized query rather than raising a database error."""
+        tour, _ = _seed_tour_and_venue(db_session)
+        quote_venue = Venue(name="O'Fallon Arena", city="O'Fallon", country="USA", capacity=5000)
+        db_session.add(quote_venue)
+        db_session.commit()
+        db_session.refresh(quote_venue)
+        create_concert(
+            db_session, tour, quote_venue, day_offset=1, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=0,
+        )
+
+        response = client.get("/api/v1/concerts/", params={"city": "O'Fallon"})
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["venue_id"] == quote_venue.id
+
+    def test_city_filter_sql_injection_payload_returns_empty_not_error(self, client, db_session):
+        """A classic SQL-injection payload in `city` is treated as a plain
+        (non-matching) string value: a 200 with an empty list, never a
+        database error and never an unintended full-table match."""
+        tour, venue = _seed_tour_and_venue(db_session)
+        create_concert(
+            db_session, tour, venue, day_offset=1, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=0,
+        )
+
+        response = client.get("/api/v1/concerts/", params={"city": "' OR '1'='1"})
         assert response.status_code == 200
         assert response.json() == []
 
