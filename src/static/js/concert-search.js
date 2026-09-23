@@ -5,11 +5,16 @@
  * GET /api/v1/concerts/?city=... endpoint, and re-renders #calendar-grid
  * client-side from the response. Clearing the input restores the full,
  * unfiltered list.
+ *
+ * #city-filter-select offers the same filter as a dropdown, populated from
+ * GET /api/v1/concerts/cities, for picking a known city outright instead of
+ * typing a substring; picking "All cities" clears the filter.
  */
 (function () {
   "use strict";
 
   const CONCERTS_ENDPOINT = "/api/v1/concerts/";
+  const CITIES_ENDPOINT = "/api/v1/concerts/cities";
   const DEBOUNCE_MS = 300;
   const MONTH_NAMES = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -76,15 +81,32 @@
     };
   }
 
+  async function populateCityFilterSelect(select) {
+    try {
+      const response = await fetch(CITIES_ENDPOINT);
+      if (!response.ok) throw new Error(`Request failed with ${response.status}`);
+      const cities = await response.json();
+      for (const city of cities) {
+        const option = document.createElement("option");
+        option.value = city;
+        option.textContent = city;
+        select.appendChild(option);
+      }
+    } catch (error) {
+      // Leave the "All cities" default option in place; the dropdown is
+      // simply not populated if the cities endpoint is unavailable.
+    }
+  }
+
   function initCitySearch() {
     const input = document.getElementById("city-search-input");
+    const select = document.getElementById("city-filter-select");
     const container = document.getElementById("calendar-grid");
     if (!input || !container) return;
 
     let requestToken = 0;
 
-    async function runSearch() {
-      const city = input.value.trim();
+    async function runSearch(city) {
       const token = ++requestToken;
       const url = city
         ? `${CONCERTS_ENDPOINT}?city=${encodeURIComponent(city)}`
@@ -102,7 +124,16 @@
       }
     }
 
-    input.addEventListener("input", debounce(runSearch, DEBOUNCE_MS));
+    input.addEventListener("input", debounce(() => runSearch(input.value.trim()), DEBOUNCE_MS));
+
+    if (select) {
+      populateCityFilterSelect(select);
+      select.addEventListener("change", () => {
+        const city = select.value;
+        input.value = city;
+        runSearch(city);
+      });
+    }
   }
 
   document.addEventListener("DOMContentLoaded", initCitySearch);

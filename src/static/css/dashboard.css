@@ -216,6 +216,22 @@ a {
   outline-offset: 1px;
 }
 
+.concert-search-select {
+  width: 100%;
+  max-width: 360px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-base);
+}
+
+.concert-search-select:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
 /* Calendar grid / concert cards */
 .calendar-grid {
   min-height: 400px;
