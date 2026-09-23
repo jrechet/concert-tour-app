@@ -109,6 +109,17 @@
                 </label>
             </div>
 
+            <div id="city-search" class="concert-search" role="search">
+                <label for="city-search-input" class="concert-search-label">Filter by city</label>
+                <input type="search"
+                       id="city-search-input"
+                       name="city"
+                       class="concert-search-input"
+                       placeholder="Filter by city"
+                       autocomplete="off"
+                       aria-label="Filter concerts by city">
+            </div>
+
             <section id="calendar-grid" class="calendar-grid" aria-label="Concert calendar"
                      hx-get="/api/v1/dashboard/concerts"
                      hx-trigger="load"
@@ -116,5 +127,6 @@
             </section>
         </main>
     </div>
+    <script src="{{ url_for('static', path='js/concert-search.js') }}"></script>
 </body>
 </html>

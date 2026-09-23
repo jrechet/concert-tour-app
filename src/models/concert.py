@@ -38,6 +38,16 @@ class Concert(Base):
         return value
 
     @property
+    def venue_name(self):
+        """The hosting venue's name, or None when no venue is attached."""
+        return self.venue.name if self.venue is not None else None
+
+    @property
+    def venue_city(self):
+        """The hosting venue's city, or None when no venue is attached."""
+        return self.venue.city if self.venue is not None else None
+
+    @property
     def remaining_tickets(self):
         """Tickets still available, derived from the venue's capacity.
 

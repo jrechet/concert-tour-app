@@ -105,6 +105,8 @@ class ConcertResponse(BaseModel):
     id: int = Field(..., description="Unique concert identifier")
     tour_id: int = Field(..., description="ID of the tour this concert belongs to")
     venue_id: int = Field(..., description="ID of the venue hosting this concert")
+    venue_name: Optional[str] = Field(None, description="Name of the venue hosting this concert")
+    venue_city: Optional[str] = Field(None, description="City of the venue hosting this concert")
     date_time: datetime = Field(..., description="Concert date and time")
     ticket_price: Optional[Decimal] = Field(None, description="Ticket price")
     tickets_sold: int = Field(..., description="Number of tickets sold so far")
@@ -128,6 +130,8 @@ class ConcertResponse(BaseModel):
                 "id": 1,
                 "tour_id": 1,
                 "venue_id": 1,
+                "venue_name": "Madison Square Garden",
+                "venue_city": "New York",
                 "date_time": "2024-07-15T20:00:00",
                 "ticket_price": "150.00",
                 "tickets_sold": 15000,
