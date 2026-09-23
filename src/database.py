@@ -1,6 +1,7 @@
 """Database configuration and session management."""
 
 import os
+from datetime import datetime
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -26,3 +27,12 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def get_reference_time() -> datetime:
+    """Dependency supplying the "now" used to split upcoming vs. past dates.
+
+    Overridable via `app.dependency_overrides` in tests, so date-based
+    ordering assertions don't depend on the real wall clock.
+    """
+    return datetime.now()
