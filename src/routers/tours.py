@@ -1,12 +1,14 @@
 """Tour CRUD endpoints."""
 
+from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy import case, func
+from sqlalchemy.orm import Session, joinedload
 
-from ..database import get_db
-from ..models import Tour
-from ..schemas import TourCreate, TourUpdate, TourResponse
+from ..database import get_db, get_reference_time
+from ..models import Concert, Tour
+from ..schemas import ConcertResponse, TourCreate, TourUpdate, TourResponse
 
 router = APIRouter(prefix="/api/v1/tours", tags=["tours"])
 
@@ -46,6 +48,38 @@ def get_tour(tour_id: int, db: Session = Depends(get_db)):
     if not tour:
         raise HTTPException(status_code=404, detail="Tour not found")
     return tour
+
+
+@router.get("/{tour_id}/dates", response_model=List[ConcertResponse])
+def get_tour_dates(
+    tour_id: int,
+    db: Session = Depends(get_db),
+    reference_time: datetime = Depends(get_reference_time),
+):
+    """Retrieve a tour's concerts in chronological order.
+
+    Upcoming concerts (today or later, compared by calendar date against
+    `reference_time`) come first, soonest first. Past concerts are appended
+    afterward, oldest first, so the full list stays chronological end to
+    end. Returns 404 if the tour doesn't exist, or an empty list if it has
+    no concerts.
+    """
+    tour_exists = db.query(Tour.id).filter(Tour.id == tour_id).first()
+    if not tour_exists:
+        raise HTTPException(status_code=404, detail="Tour not found")
+
+    is_past = case(
+        (func.date(Concert.date_time) < func.date(reference_time), 1),
+        else_=0,
+    )
+    concerts = (
+        db.query(Concert)
+        .options(joinedload(Concert.venue))
+        .filter(Concert.tour_id == tour_id)
+        .order_by(is_past, Concert.date_time)
+        .all()
+    )
+    return concerts
 
 
 @router.put("/{tour_id}", response_model=TourResponse)
