@@ -1,15 +1,16 @@
 """Concert-facing endpoints: the JSON list/detail API and the HTMX
 dashboard concert-card fragments."""
 
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session, joinedload
 
-from ..database import get_db
+from ..database import get_db, get_reference_time
 from ..models import Concert, LineupEntry, Tour, Venue
 from ..schemas import CancelConcertRequest, ConcertResponse, LineupEntryResponse
 
@@ -33,10 +34,16 @@ def get_concerts(
     include_cancelled: bool = Query(
         True, description="When false, cancelled concerts are excluded from the results"
     ),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    reference_time: datetime = Depends(get_reference_time),
 ):
     """Retrieve all concerts with pagination, including remaining ticket
     counts and sold-out status derived from each concert's venue.
+
+    Results are ordered chronologically by default: upcoming concerts
+    (today or later, compared by calendar date against `reference_time`)
+    come first, soonest first, with past concerts appended afterward,
+    oldest first.
 
     When `city` is provided and non-blank, results are narrowed to concerts
     whose venue city contains that text (case-insensitive substring match)
@@ -47,7 +54,15 @@ def get_concerts(
     is false, cancelled concerts are excluded before pagination is applied;
     it defaults to true so existing clients see no change in behavior.
     """
-    query = db.query(Concert).options(joinedload(Concert.venue)).order_by(Concert.id)
+    is_past = case(
+        (func.date(Concert.date_time) < func.date(reference_time), 1),
+        else_=0,
+    )
+    query = (
+        db.query(Concert)
+        .options(joinedload(Concert.venue))
+        .order_by(is_past, Concert.date_time)
+    )
 
     if city:
         query = query.join(Concert.venue).filter(
