@@ -1,9 +1,30 @@
 """Tests for the concert list/detail JSON API endpoints."""
 
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from decimal import Decimal
 
+from sqlalchemy import event
+
+from tests.conftest import engine
 from tests.fixtures.dashboard_fixtures import create_concert, create_tour, create_venues
+
+
+@contextmanager
+def _count_queries():
+    """Count SQL statements executed against the test engine while the
+    `with` block runs, so tests can assert a fixed query count rather than
+    one that scales with the number of rows returned (i.e. no N+1)."""
+    statements = []
+
+    def _listener(conn, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", _listener)
+    try:
+        yield statements
+    finally:
+        event.remove(engine, "before_cursor_execute", _listener)
 
 
 def _seed_tour_and_venue(db_session):
@@ -527,3 +548,43 @@ class TestRemainingTicketsField:
         second_page = client.get("/api/v1/concerts/?skip=2&limit=2")
         assert second_page.status_code == 200
         assert [c["remaining_tickets"] for c in second_page.json()] == expected[2:]
+
+
+class TestRemainingTicketsQueryEfficiency:
+    """remaining_tickets is derived from each concert's venue, so the list
+    endpoint must eager-load venues in one join rather than issuing a
+    separate query per concert (N+1)."""
+
+    def test_list_endpoint_query_count_does_not_scale_with_result_size(self, client, db_session):
+        tour, venues = _seed_multi_city_tour(db_session, venue_count=3)
+        base_time = datetime.now()
+        for i in range(9):
+            create_concert(
+                db_session, tour, venues[i % len(venues)], day_offset=i,
+                ticket_price="50.00", base_time=base_time, tickets_sold=i,
+            )
+
+        with _count_queries() as few_result_queries:
+            response = client.get("/api/v1/concerts/?limit=3")
+        assert response.status_code == 200
+        assert len(response.json()) == 3
+
+        with _count_queries() as many_result_queries:
+            response = client.get("/api/v1/concerts/?limit=9")
+        assert response.status_code == 200
+        assert len(response.json()) == 9
+
+        assert len(few_result_queries) == len(many_result_queries)
+        assert len(many_result_queries) == 1
+
+    def test_detail_endpoint_uses_single_query(self, client, db_session):
+        tour, venue = _seed_tour_and_venue(db_session)
+        concert = create_concert(
+            db_session, tour, venue, day_offset=1, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=10,
+        )
+
+        with _count_queries() as queries:
+            response = client.get(f"/api/v1/concerts/{concert.id}")
+        assert response.status_code == 200
+        assert len(queries) == 1
