@@ -442,6 +442,53 @@ class TestCityFilterSqlSafetyAndEdgeCases:
         assert len(data) == 1
         assert data[0]["venue_id"] == underscore_venue.id
 
+    def test_city_filter_matches_partial_substring(self, client, db_session):
+        """A query for a substring of a city name (not the full name) still
+        matches, e.g. "paris" matching a venue city of "Paris, France"."""
+        tour = create_tour(
+            db_session, name="Partial Match Tour", artist="Test Artist",
+            start_date=(datetime.now() - timedelta(days=1)).date(),
+            end_date=(datetime.now() + timedelta(days=90)).date(),
+            status="active",
+        )
+        paris_venue = Venue(name="Paris Arena", city="Paris, France", country="France", capacity=5000)
+        other_venue = Venue(name="Other Arena", city="London", country="UK", capacity=5000)
+        db_session.add_all([paris_venue, other_venue])
+        db_session.commit()
+        db_session.refresh(paris_venue)
+        db_session.refresh(other_venue)
+        base_time = datetime.now()
+        create_concert(
+            db_session, tour, paris_venue, day_offset=1, ticket_price="50.00",
+            base_time=base_time, tickets_sold=0,
+        )
+        create_concert(
+            db_session, tour, other_venue, day_offset=2, ticket_price="50.00",
+            base_time=base_time, tickets_sold=0,
+        )
+
+        response = client.get("/api/v1/concerts/", params={"city": "paris"})
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["venue_id"] == paris_venue.id
+
+    def test_city_filter_blank_value_returns_unfiltered_list(self, client, db_session):
+        """An empty `city` query param is treated the same as omitting the
+        filter, returning the full unfiltered list."""
+        tour, venues = _seed_multi_city_tour(db_session, venue_count=3)
+        base_time = datetime.now()
+        for i, venue in enumerate(venues):
+            create_concert(
+                db_session, tour, venue, day_offset=i, ticket_price="50.00",
+                base_time=base_time, tickets_sold=0,
+            )
+
+        response = client.get("/api/v1/concerts/", params={"city": ""})
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == len(venues)
+
     def test_city_filter_handles_quote_character_without_error(self, client, db_session):
         """A city value containing a single quote is handled safely by the
         parameterized query rather than raising a database error."""
