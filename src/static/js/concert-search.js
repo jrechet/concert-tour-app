@@ -2,9 +2,10 @@
  * Live city search for the dashboard concert list.
  *
  * Debounces keystrokes in #city-search-input, calls the JSON
- * GET /api/v1/concerts/?city=... endpoint, and re-renders #calendar-grid
- * client-side from the response. Clearing the input restores the full,
- * unfiltered list.
+ * GET /api/v1/concerts/?upcoming_only=true&city=... endpoint, and
+ * re-renders #calendar-grid client-side from the response, soonest date
+ * first with the first card marked as the next show. Clearing the input
+ * restores the full, unfiltered upcoming list.
  *
  * #city-filter-select offers the same filter as a dropdown, populated from
  * GET /api/v1/concerts/cities, for picking a known city outright instead of
@@ -34,7 +35,7 @@
     return `${MONTH_NAMES[month - 1]} ${String(day).padStart(2, "0")}, ${year}`;
   }
 
-  function renderConcertCard(concert) {
+  function renderConcertCard(concert, isNextShow) {
     const venueName = escapeHtml(concert.venue_name);
     const venueCity = escapeHtml(concert.venue_city);
     const cancelledBadge = concert.is_cancelled
@@ -42,6 +43,9 @@
       : "";
     const cancellationReason = concert.is_cancelled && concert.cancellation_reason
       ? `<p class="cancellation-reason">${escapeHtml(concert.cancellation_reason)}</p>`
+      : "";
+    const nextShowBadge = isNextShow
+      ? '<span class="next-show-badge" role="status">Next Show</span>'
       : "";
 
     let ticketMarkup = "";
@@ -52,7 +56,8 @@
     }
 
     return `
-      <article class="concert-card">
+      <article class="concert-card${isNextShow ? " concert-card-next" : ""}">
+        ${nextShowBadge}
         <div class="concert-card-date">${escapeHtml(formatDate(concert.date_time))}</div>
         <div class="concert-card-venue">
           ${venueName}, ${venueCity}
@@ -69,7 +74,7 @@
       container.innerHTML = '<p class="concert-cards-empty">No concerts found.</p>';
       return;
     }
-    const cards = concerts.map(renderConcertCard).join("");
+    const cards = concerts.map((concert, index) => renderConcertCard(concert, index === 0)).join("");
     container.innerHTML = `<div class="concert-cards" role="list">${cards}</div>`;
   }
 
@@ -109,8 +114,8 @@
     async function runSearch(city) {
       const token = ++requestToken;
       const url = city
-        ? `${CONCERTS_ENDPOINT}?city=${encodeURIComponent(city)}`
-        : CONCERTS_ENDPOINT;
+        ? `${CONCERTS_ENDPOINT}?upcoming_only=true&city=${encodeURIComponent(city)}`
+        : `${CONCERTS_ENDPOINT}?upcoming_only=true`;
 
       try {
         const response = await fetch(url);

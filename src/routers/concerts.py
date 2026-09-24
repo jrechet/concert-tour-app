@@ -34,6 +34,9 @@ def get_concerts(
     include_cancelled: bool = Query(
         True, description="When false, cancelled concerts are excluded from the results"
     ),
+    upcoming_only: bool = Query(
+        False, description="When true, only concerts today or later are returned, soonest first, and past concerts are excluded rather than appended"
+    ),
     db: Session = Depends(get_db),
     reference_time: datetime = Depends(get_reference_time),
 ):
@@ -52,7 +55,10 @@ def get_concerts(
     concerts whose tour artist name contains that text (case-insensitive
     substring match) before pagination is applied. When `include_cancelled`
     is false, cancelled concerts are excluded before pagination is applied;
-    it defaults to true so existing clients see no change in behavior.
+    it defaults to true so existing clients see no change in behavior. When
+    `upcoming_only` is true, past concerts are excluded entirely (rather than
+    appended after upcoming ones), so the soonest concert is always first;
+    it defaults to false so existing clients see no change in behavior.
     """
     is_past = case(
         (func.date(Concert.date_time) < func.date(reference_time), 1),
@@ -74,6 +80,9 @@ def get_concerts(
 
     if not include_cancelled:
         query = query.filter(Concert.is_cancelled.is_(False))
+
+    if upcoming_only:
+        query = query.filter(func.date(Concert.date_time) >= func.date(reference_time))
 
     concerts = query.offset(skip).limit(limit).all()
     return concerts
@@ -206,7 +215,11 @@ def get_dashboard_concerts(
     include_cancelled: bool = Query(
         True, description="When false, cancelled concerts are excluded from the results"
     ),
+    upcoming_only: bool = Query(
+        False, description="When true, only concerts today or later are returned, soonest first, for the public-facing view"
+    ),
     db: Session = Depends(get_db),
+    reference_time: datetime = Depends(get_reference_time),
 ):
     """Render concert cards showing date, venue, and ticket availability.
 
@@ -218,6 +231,11 @@ def get_dashboard_concerts(
     When `include_cancelled` is false, cancelled concerts are excluded.
     Defaults to true so the list shows everything unless the caller opts
     into hiding cancelled dates.
+
+    When `upcoming_only` is true, past concerts are excluded and the list is
+    ordered soonest first, so the first card is always the next upcoming
+    show; the template highlights it accordingly. Defaults to false so
+    existing callers see no change in behavior.
     """
     query = db.query(Concert).options(joinedload(Concert.venue)).order_by(Concert.date_time)
 
@@ -227,7 +245,10 @@ def get_dashboard_concerts(
     if not include_cancelled:
         query = query.filter(Concert.is_cancelled.is_(False))
 
+    if upcoming_only:
+        query = query.filter(func.date(Concert.date_time) >= func.date(reference_time))
+
     concerts = query.all()
     return templates.TemplateResponse(
-        request, "dashboard_concerts.html", {"concerts": concerts}
+        request, "dashboard_concerts.html", {"concerts": concerts, "upcoming_only": upcoming_only}
     )

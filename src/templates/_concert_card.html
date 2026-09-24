@@ -1,4 +1,7 @@
-<article class="concert-card">
+<article class="concert-card{% if is_next_show %} concert-card-next{% endif %}">
+    {% if is_next_show %}
+    <span class="next-show-badge" role="status">Next Show</span>
+    {% endif %}
     <div class="concert-card-date">{{ concert.date_time.strftime('%b %d, %Y') }}</div>
     <div class="concert-card-venue">
         {{ concert.venue.name|e }}, {{ concert.venue.city|e }}

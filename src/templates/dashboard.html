@@ -90,7 +90,7 @@
                        placeholder="Search by artist name&hellip;"
                        autocomplete="off"
                        aria-label="Search concerts by artist name"
-                       hx-get="/api/v1/dashboard/concerts"
+                       hx-get="/api/v1/dashboard/concerts?upcoming_only=true"
                        hx-trigger="keyup changed delay:300ms, search"
                        hx-include="#hide-cancelled-checkbox"
                        hx-target="#calendar-grid"
@@ -100,7 +100,7 @@
                            id="hide-cancelled-checkbox"
                            name="include_cancelled"
                            value="false"
-                           hx-get="/api/v1/dashboard/concerts"
+                           hx-get="/api/v1/dashboard/concerts?upcoming_only=true"
                            hx-trigger="change"
                            hx-include="#artist-search-input"
                            hx-target="#calendar-grid"
@@ -128,7 +128,7 @@
             </div>
 
             <section id="calendar-grid" class="calendar-grid" aria-label="Concert calendar"
-                     hx-get="/api/v1/dashboard/concerts"
+                     hx-get="/api/v1/dashboard/concerts?upcoming_only=true"
                      hx-trigger="load"
                      hx-swap="innerHTML">
             </section>
