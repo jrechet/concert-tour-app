@@ -250,5 +250,7 @@ def get_dashboard_concerts(
 
     concerts = query.all()
     return templates.TemplateResponse(
-        request, "dashboard_concerts.html", {"concerts": concerts, "upcoming_only": upcoming_only}
+        request,
+        "dashboard_concerts.html",
+        {"concerts": concerts, "upcoming_only": upcoming_only, "reference_time": reference_time},
     )

@@ -3,6 +3,16 @@
     <span class="next-show-badge" role="status">Next Show</span>
     {% endif %}
     <div class="concert-card-date">{{ concert.date_time.strftime('%b %d, %Y') }}</div>
+    {% if reference_time is defined and not concert.is_cancelled %}
+    {% set days_until = (concert.date_time.date() - reference_time.date()).days %}
+    {% if days_until == 0 %}
+    <div class="concert-card-countdown">Today</div>
+    {% elif days_until == 1 %}
+    <div class="concert-card-countdown">Tomorrow</div>
+    {% elif days_until > 1 %}
+    <div class="concert-card-countdown">{{ days_until }} days remaining</div>
+    {% endif %}
+    {% endif %}
     <div class="concert-card-venue">
         {{ concert.venue.name|e }}, {{ concert.venue.city|e }}
         {% if concert.is_cancelled %}
