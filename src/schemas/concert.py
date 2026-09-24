@@ -108,6 +108,9 @@ class ConcertResponse(BaseModel):
     venue_name: Optional[str] = Field(None, description="Name of the venue hosting this concert")
     venue_city: Optional[str] = Field(None, description="City of the venue hosting this concert")
     date_time: datetime = Field(..., description="Concert date and time")
+    days_until_concert: int = Field(
+        ..., description="Calendar days from now until this concert's date; 0 today, negative once it has passed"
+    )
     ticket_price: Optional[Decimal] = Field(None, description="Ticket price")
     tickets_sold: int = Field(..., description="Number of tickets sold so far")
     remaining_tickets: Optional[int] = Field(
@@ -133,6 +136,7 @@ class ConcertResponse(BaseModel):
                 "venue_name": "Madison Square Garden",
                 "venue_city": "New York",
                 "date_time": "2024-07-15T20:00:00",
+                "days_until_concert": 30,
                 "ticket_price": "150.00",
                 "tickets_sold": 15000,
                 "remaining_tickets": 5000,
