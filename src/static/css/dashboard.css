@@ -289,6 +289,23 @@ a {
   color: var(--color-bg);
 }
 
+.concert-card-next {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+.next-show-badge {
+  align-self: flex-start;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-accent);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .cancellation-badge {
   display: inline-block;
   padding: var(--spacing-xs) var(--spacing-sm);

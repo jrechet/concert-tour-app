@@ -43,7 +43,7 @@ def test_dashboard_contains_debounced_search_input(client):
 
     assert response.status_code == 200
     assert 'name="artist_name"' in response.text
-    assert 'hx-get="/api/v1/dashboard/concerts"' in response.text
+    assert 'hx-get="/api/v1/dashboard/concerts?upcoming_only=true"' in response.text
     assert "keyup changed delay:300ms" in response.text
     assert 'hx-target="#calendar-grid"' in response.text
 

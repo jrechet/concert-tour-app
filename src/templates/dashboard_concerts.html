@@ -1,6 +1,7 @@
 {% if concerts %}
 <div class="concert-cards" role="list">
     {% for concert in concerts %}
+    {% set is_next_show = upcoming_only and loop.first %}
     {% include "_concert_card.html" %}
     {% endfor %}
 </div>
