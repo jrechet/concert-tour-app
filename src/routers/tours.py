@@ -76,7 +76,9 @@ def get_tour_dates(
         db.query(Concert)
         .options(joinedload(Concert.venue))
         .filter(Concert.tour_id == tour_id)
-        .order_by(is_past, Concert.date_time)
+        # Concert.id is a tiebreaker so concerts sharing the same date_time
+        # still come back in a stable, deterministic order.
+        .order_by(is_past, Concert.date_time, Concert.id)
         .all()
     )
     return concerts

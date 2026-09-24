@@ -143,3 +143,24 @@ class TestTourDateOrdering:
     def test_dates_for_nonexistent_tour_returns_404(self, client):
         response = client.get("/api/v1/tours/999999/dates")
         assert response.status_code == 404
+
+    def test_identical_dates_break_ties_by_id_ascending(self, client, db_session):
+        """Two concerts sharing the exact same `date_time` (different
+        venues) must still come back in a stable order — the endpoint
+        breaks ties by ascending `id`."""
+        venues = create_venues(db_session, count=2)
+        tour = create_tour(
+            db_session, "Double Header Tour", "Test Artist",
+            (REFERENCE_TIME - timedelta(days=5)).date(),
+            (REFERENCE_TIME + timedelta(days=30)).date(),
+            "active",
+        )
+        same_time = REFERENCE_TIME + timedelta(days=10)
+        first = create_concert(db_session, tour, venues[0], day_offset=10, ticket_price="80.00", base_time=REFERENCE_TIME)
+        second = create_concert(db_session, tour, venues[1], day_offset=10, ticket_price="80.00", base_time=REFERENCE_TIME)
+        assert first.date_time == second.date_time == same_time
+        assert first.id < second.id
+
+        responses = [client.get(f"/api/v1/tours/{tour.id}/dates").json() for _ in range(3)]
+        for data in responses:
+            assert [item["id"] for item in data] == [first.id, second.id]
