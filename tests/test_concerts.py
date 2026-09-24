@@ -694,6 +694,35 @@ class TestRemainingTicketsField:
         listing = client.get("/api/v1/concerts/")
         assert listing.json()[0]["remaining_tickets"] == 0
 
+    def test_zero_capacity_venue_reports_sold_out_true(self, client, db_session):
+        """A venue with zero capacity has zero remaining tickets by
+        definition, so `sold_out` must be True on both the list and detail
+        endpoints even though no tickets were ever sold."""
+        tour = create_tour(
+            db_session, name="Zero Capacity Tour", artist="Test Artist",
+            start_date=(datetime.now() - timedelta(days=1)).date(),
+            end_date=(datetime.now() + timedelta(days=90)).date(),
+            status="active",
+        )
+        venue = Venue(name="Unbuilt Venue", city="Testville", country="USA", capacity=0)
+        db_session.add(venue)
+        db_session.commit()
+        db_session.refresh(venue)
+        concert = create_concert(
+            db_session, tour, venue, day_offset=1, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=0,
+        )
+
+        detail = client.get(f"/api/v1/concerts/{concert.id}")
+        assert detail.status_code == 200
+        assert detail.json()["remaining_tickets"] == 0
+        assert detail.json()["sold_out"] is True
+
+        listing = client.get("/api/v1/concerts/")
+        assert listing.status_code == 200
+        assert listing.json()[0]["remaining_tickets"] == 0
+        assert listing.json()[0]["sold_out"] is True
+
     def test_remaining_tickets_correct_per_item_across_paginated_list(self, client, db_session):
         """Each page of results carries the correct remaining_tickets for
         its own concert, not just a presence check."""
