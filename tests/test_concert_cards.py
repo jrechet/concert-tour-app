@@ -111,6 +111,23 @@ def test_dashboard_concerts_endpoint_shows_sold_out_badge_not_zero_left(client, 
     assert "0 tickets left" not in response.text
 
 
+def test_dashboard_concerts_endpoint_shows_sold_out_badge_for_zero_capacity_venue(client, db_session):
+    venue = Venue(name="Unbuilt Venue", city="Testville", country="USA", capacity=0)
+    db_session.add(venue)
+    db_session.commit()
+    db_session.refresh(venue)
+    tour = _make_tour(db_session, "Zero Capacity Tour")
+    create_concert(
+        db_session, tour, venue, day_offset=5, ticket_price="50.00",
+        base_time=datetime.now(), tickets_sold=0,
+    )
+
+    response = client.get("/api/v1/dashboard/concerts")
+
+    assert response.status_code == 200
+    assert "Sold Out" in response.text
+
+
 def test_dashboard_concerts_endpoint_escapes_venue_name(client, db_session):
     venue = Venue(name="<script>alert('xss')</script>", city="Testville", country="USA", capacity=100)
     db_session.add(venue)
