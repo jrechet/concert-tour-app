@@ -127,6 +127,7 @@ class TestUpcomingConcerts:
             "venue_name",
             "venue_city",
             "date_time",
+            "days_until_concert",
             "ticket_price",
             "tickets_sold",
             "remaining_tickets",

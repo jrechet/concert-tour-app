@@ -4,7 +4,7 @@ from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Numeric, 
 from sqlalchemy.orm import relationship, validates
 
 from ..config import ALMOST_SOLD_OUT_THRESHOLD
-from ..database import Base
+from ..database import Base, get_reference_time
 
 
 class Concert(Base):
@@ -79,6 +79,15 @@ class Concert(Base):
         if remaining is None:
             return False
         return (remaining / capacity) < ALMOST_SOLD_OUT_THRESHOLD
+
+    @property
+    def days_until_concert(self):
+        """Calendar days from `get_reference_time()` until this concert's
+        date. Compares dates only (not exact timestamps), so a concert later
+        today is 0 days away rather than a fractional day, and the result is
+        negative once the concert's date has passed.
+        """
+        return (self.date_time.date() - get_reference_time().date()).days
 
 
 @event.listens_for(Concert, "before_insert")
