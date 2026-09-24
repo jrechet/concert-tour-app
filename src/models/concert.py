@@ -15,7 +15,7 @@ class Concert(Base):
     id = Column(Integer, primary_key=True, index=True)
     tour_id = Column(Integer, ForeignKey("tours.id"), nullable=False, index=True)
     venue_id = Column(Integer, ForeignKey("venues.id"), nullable=False, index=True)
-    date_time = Column(DateTime, nullable=False)
+    date_time = Column(DateTime, nullable=False, index=True)
     ticket_price = Column(Numeric(10, 2), nullable=True)
     tickets_sold = Column(Integer, nullable=False, default=0)
     is_cancelled = Column(Boolean, nullable=False, default=False, server_default="0")
