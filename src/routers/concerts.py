@@ -15,6 +15,7 @@ from ..database import get_db, get_reference_time
 from ..models import Concert, LineupEntry, Tour, Venue
 from ..schemas import CancelConcertRequest, ConcertResponse, LineupEntryResponse
 from ..services.concerts_service import generate_concerts_csv
+from ..services.concerts_service import get_upcoming_concerts as fetch_upcoming_concerts
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
 api_router = APIRouter(prefix="/api/v1/concerts", tags=["concerts"])
@@ -125,14 +126,7 @@ def get_upcoming_concerts(
     `reference_time`) is today or in the future; past concerts are
     excluded entirely rather than appended, unlike `GET /`.
     """
-    concerts = (
-        db.query(Concert)
-        .options(joinedload(Concert.venue))
-        .filter(func.date(Concert.date_time) >= func.date(reference_time))
-        .order_by(Concert.date_time)
-        .all()
-    )
-    return concerts
+    return fetch_upcoming_concerts(db, reference_time)
 
 
 @api_router.get("/export.csv")
