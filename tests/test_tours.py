@@ -4,11 +4,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from datetime import date
+from datetime import date, datetime
 
 from src.main import app
 from src.database import get_db
-from src.models import Base
+from src.models import Base, Concert, Tour, Venue
 
 # Create test database
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
@@ -188,3 +188,103 @@ def test_create_tour_validation_error():
     }
     response = client.post("/api/v1/tours/", json=invalid_tour_data)
     assert response.status_code == 422
+
+
+def _create_tour_orm(session, name="Test Tour", artist="Test Artist"):
+    """Persist and return a `Tour` row via the ORM."""
+    tour = Tour(
+        name=name,
+        artist=artist,
+        start_date=date(2024, 1, 1),
+        end_date=date(2024, 12, 31),
+        status="active",
+    )
+    session.add(tour)
+    session.commit()
+    session.refresh(tour)
+    return tour
+
+
+def _create_venue_orm(session, name, city):
+    """Persist and return a `Venue` row via the ORM."""
+    venue = Venue(name=name, city=city, country="USA", capacity=10000)
+    session.add(venue)
+    session.commit()
+    session.refresh(venue)
+    return venue
+
+
+def _create_concert_orm(session, tour, venue, when):
+    """Persist and return a `Concert` linked to a real tour and venue via FK."""
+    concert = Concert(tour_id=tour.id, venue_id=venue.id, date_time=when)
+    session.add(concert)
+    session.commit()
+    session.refresh(concert)
+    return concert
+
+
+def test_get_tour_summary_multiple_dates_and_cities():
+    """Summary aggregates counts/dates correctly across distinct and repeated cities."""
+    session = TestingSessionLocal()
+    tour = _create_tour_orm(session, name="Summary Tour")
+    new_york = _create_venue_orm(session, "Madison Square Garden", "New York")
+    los_angeles = _create_venue_orm(session, "Crypto.com Arena", "Los Angeles")
+    new_york_2 = _create_venue_orm(session, "Barclays Center", "New York")
+    chicago = _create_venue_orm(session, "United Center", "Chicago")
+    _create_concert_orm(session, tour, new_york, datetime(2024, 6, 10, 20, 0))
+    _create_concert_orm(session, tour, los_angeles, datetime(2024, 6, 5, 20, 0))
+    _create_concert_orm(session, tour, new_york_2, datetime(2024, 6, 20, 20, 0))
+    _create_concert_orm(session, tour, chicago, datetime(2024, 6, 15, 20, 0))
+    tour_id = tour.id
+    session.close()
+
+    response = client.get(f"/api/v1/tours/{tour_id}/summary")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["tour_id"] == tour_id
+    assert data["date_count"] == 4
+    assert data["first_date"] == "2024-06-05"
+    assert data["last_date"] == "2024-06-20"
+    assert data["distinct_city_count"] == 3
+
+
+def test_get_tour_summary_single_date():
+    """A tour with exactly one date has matching first/last dates and one city."""
+    session = TestingSessionLocal()
+    tour = _create_tour_orm(session, name="One Night Only Tour")
+    venue = _create_venue_orm(session, "Ryman Auditorium", "Nashville")
+    _create_concert_orm(session, tour, venue, datetime(2024, 7, 4, 19, 30))
+    tour_id = tour.id
+    session.close()
+
+    response = client.get(f"/api/v1/tours/{tour_id}/summary")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["date_count"] == 1
+    assert data["first_date"] == data["last_date"] == "2024-07-04"
+    assert data["distinct_city_count"] == 1
+
+
+def test_get_tour_summary_no_dates():
+    """A tour with zero concerts yields zeroed counts and null dates."""
+    session = TestingSessionLocal()
+    tour = _create_tour_orm(session, name="Unannounced Tour")
+    tour_id = tour.id
+    session.close()
+
+    response = client.get(f"/api/v1/tours/{tour_id}/summary")
+    assert response.status_code == 200
+    data = response.json()
+    assert data == {
+        "tour_id": tour_id,
+        "date_count": 0,
+        "first_date": None,
+        "last_date": None,
+        "distinct_city_count": 0,
+    }
+
+
+def test_get_tour_summary_not_found():
+    """Requesting a summary for a nonexistent tour returns 404."""
+    response = client.get("/api/v1/tours/999/summary")
+    assert response.status_code == 404
