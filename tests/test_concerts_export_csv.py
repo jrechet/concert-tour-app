@@ -42,6 +42,7 @@ class TestConcertsExportCsv:
     def test_values_with_commas_and_quotes_are_escaped(self, client, db_session):
         venues = create_venues(db_session, count=1)
         venues[0].name = 'The "Garden", Arena'
+        venues[0].city = "Washington, D.C."
         db_session.commit()
         tour = create_tour(
             db_session, "Tour, With Commas", "Test Artist",
@@ -55,6 +56,7 @@ class TestConcertsExportCsv:
         rows = list(csv.reader(io.StringIO(response.text)))
 
         assert rows[1] == [concert.date_time.date().isoformat(), venues[0].city, venues[0].name, tour.name]
+        assert '"Washington, D.C."' in response.text
         assert '"The ""Garden"", Arena"' in response.text
         assert '"Tour, With Commas"' in response.text
 
