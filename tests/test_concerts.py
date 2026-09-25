@@ -203,6 +203,89 @@ def test_get_concerts_unknown_city_returns_empty_list(client, db_session):
     assert response.json() == []
 
 
+def test_get_concerts_filtered_by_venue(client, db_session):
+    """?venue=<Venue> narrows results to concerts at that venue."""
+    tour = create_tour(
+        db_session,
+        name="Multi-Venue Tour",
+        artist="Test Artist",
+        start_date=(datetime.now() - timedelta(days=1)).date(),
+        end_date=(datetime.now() + timedelta(days=90)).date(),
+        status="active",
+    )
+    venues = create_venues(db_session, count=2)
+    base_time = datetime.now()
+    create_concert(
+        db_session, tour, venues[0], day_offset=1, ticket_price="50.00",
+        base_time=base_time, tickets_sold=0,
+    )
+    create_concert(
+        db_session, tour, venues[1], day_offset=2, ticket_price="60.00",
+        base_time=base_time, tickets_sold=0,
+    )
+
+    response = client.get(f"/api/v1/concerts/?venue={venues[0].name}")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["venue_id"] == venues[0].id
+
+
+def test_get_concerts_filtered_by_venue_case_insensitive(client, db_session):
+    """Venue filtering matches regardless of case."""
+    tour, venue = _seed_tour_and_venue(db_session)
+    create_concert(
+        db_session, tour, venue, day_offset=1, ticket_price="50.00",
+        base_time=datetime.now(), tickets_sold=0,
+    )
+
+    exact_response = client.get(f"/api/v1/concerts/?venue={venue.name}")
+    upper_response = client.get(f"/api/v1/concerts/?venue={venue.name.upper()}")
+    assert exact_response.status_code == 200
+    assert upper_response.status_code == 200
+    assert exact_response.json() == upper_response.json()
+    assert len(upper_response.json()) == 1
+
+
+def test_get_concerts_unknown_venue_returns_empty_list(client, db_session):
+    """An unknown/nonexistent venue returns an empty list, not an error."""
+    tour, venue = _seed_tour_and_venue(db_session)
+    create_concert(
+        db_session, tour, venue, day_offset=1, ticket_price="50.00",
+        base_time=datetime.now(), tickets_sold=0,
+    )
+
+    response = client.get("/api/v1/concerts/?venue=Nonexistent Arena")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_get_concerts_no_venue_filter_returns_all(client, db_session):
+    """Omitting venue returns all concerts, matching existing behavior."""
+    tour = create_tour(
+        db_session,
+        name="Multi-Venue Tour",
+        artist="Test Artist",
+        start_date=(datetime.now() - timedelta(days=1)).date(),
+        end_date=(datetime.now() + timedelta(days=90)).date(),
+        status="active",
+    )
+    venues = create_venues(db_session, count=2)
+    base_time = datetime.now()
+    create_concert(
+        db_session, tour, venues[0], day_offset=1, ticket_price="50.00",
+        base_time=base_time, tickets_sold=0,
+    )
+    create_concert(
+        db_session, tour, venues[1], day_offset=2, ticket_price="60.00",
+        base_time=base_time, tickets_sold=0,
+    )
+
+    response = client.get("/api/v1/concerts/")
+    assert response.status_code == 200
+    assert len(response.json()) == 2
+
+
 def test_get_concerts_city_filter_combines_with_pagination(client, db_session):
     """city filter and skip/limit combine correctly."""
     tour = create_tour(
