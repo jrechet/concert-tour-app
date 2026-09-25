@@ -8,32 +8,56 @@ from pydantic import BaseModel, Field
 
 
 class CitiesResponse(BaseModel):
-    """Schema for the distinct-cities stats response."""
+    """Schema wrapping the distinct list of cities hosting at least one concert."""
 
-    cities: List[str] = Field(
-        ..., description="Sorted list of distinct cities hosting at least one concert"
-    )
+    cities: List[str] = Field(..., description="Distinct, alphabetically sorted list of cities")
 
     class Config:
         """Pydantic configuration."""
         schema_extra = {
             "example": {
-                "cities": ["Chicago", "New York", "San Francisco"],
+                "cities": ["London", "New York", "Paris"]
             }
         }
 
 
 class VenuesResponse(BaseModel):
-    """Schema for the distinct-venues stats response."""
+    """Schema wrapping the distinct list of venue names hosting at least one concert."""
 
-    venues: List[str] = Field(
-        ..., description="Sorted list of distinct venue names hosting at least one concert"
-    )
+    venues: List[str] = Field(..., description="Distinct, alphabetically sorted list of venue names")
 
     class Config:
         """Pydantic configuration."""
         schema_extra = {
             "example": {
-                "venues": ["Madison Square Garden", "The Fillmore"],
+                "venues": ["Madison Square Garden", "The O2 Arena"]
+            }
+        }
+
+
+class CountResponse(BaseModel):
+    """Schema wrapping the total number of concerts."""
+
+    count: int = Field(..., description="Total number of concerts")
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "count": 42
+            }
+        }
+
+
+class UpcomingCountResponse(BaseModel):
+    """Schema wrapping the count of concerts scheduled today or later."""
+
+    count: int = Field(..., description="Number of concerts scheduled today or later")
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "count": 5
             }
         }

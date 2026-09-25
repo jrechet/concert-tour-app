@@ -7,8 +7,8 @@ from sqlalchemy import case, func
 from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db, get_reference_time
-from ..models import Concert, Tour
-from ..schemas import ConcertResponse, TourCreate, TourUpdate, TourResponse
+from ..models import Concert, Tour, Venue
+from ..schemas import ConcertResponse, TourCreate, TourUpdate, TourResponse, TourSummary
 
 router = APIRouter(prefix="/api/v1/tours", tags=["tours"])
 
@@ -82,6 +82,43 @@ def get_tour_dates(
         .all()
     )
     return concerts
+
+
+@router.get("/{tour_id}/summary", response_model=TourSummary)
+def get_tour_summary(tour_id: int, db: Session = Depends(get_db)):
+    """Retrieve aggregate stats for a tour's dates.
+
+    Returns 404 if the tour doesn't exist. A tour with no concerts yields
+    a zeroed-out summary with null first/last dates.
+    """
+    tour_exists = db.query(Tour.id).filter(Tour.id == tour_id).first()
+    if not tour_exists:
+        raise HTTPException(status_code=404, detail="Tour not found")
+
+    date_count, first_date, last_date = (
+        db.query(
+            func.count(Concert.id),
+            func.min(Concert.date_time),
+            func.max(Concert.date_time),
+        )
+        .filter(Concert.tour_id == tour_id)
+        .one()
+    )
+    distinct_city_count = (
+        db.query(Venue.city)
+        .join(Concert, Concert.venue_id == Venue.id)
+        .filter(Concert.tour_id == tour_id)
+        .distinct()
+        .count()
+    )
+
+    return TourSummary(
+        tour_id=tour_id,
+        date_count=date_count,
+        first_date=first_date.date() if first_date else None,
+        last_date=last_date.date() if last_date else None,
+        distinct_city_count=distinct_city_count,
+    )
 
 
 @router.put("/{tour_id}", response_model=TourResponse)

@@ -1,39 +1,22 @@
-"""Read-only aggregate stats endpoints."""
+"""Aggregate stats endpoints for populating filter controls: the distinct
+cities and venue names that currently host at least one concert, and the
+count of concerts scheduled today or later."""
+
+from datetime import datetime
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from ..database import get_db
-from ..models import Concert, Venue
-from ..schemas import CitiesResponse, VenuesResponse
+from ..database import get_db, get_reference_time
+from ..schemas import CitiesResponse, CountResponse, UpcomingCountResponse, VenuesResponse
+from ..services.stats_service import (
+    get_concert_count,
+    get_distinct_cities,
+    get_distinct_venue_names,
+    get_upcoming_concert_count,
+)
 
 router = APIRouter(prefix="/api/v1/stats", tags=["stats"])
-
-
-def get_distinct_cities(db: Session) -> list:
-    """Retrieve the distinct list of cities hosting at least one concert,
-    sorted alphabetically. Returns an empty list when there is no data."""
-    rows = (
-        db.query(Venue.city)
-        .join(Concert, Concert.venue_id == Venue.id)
-        .distinct()
-        .order_by(Venue.city)
-        .all()
-    )
-    return [row[0] for row in rows]
-
-
-def get_distinct_venue_names(db: Session) -> list:
-    """Retrieve the distinct list of venue names hosting at least one concert,
-    sorted alphabetically. Returns an empty list when there is no data."""
-    rows = (
-        db.query(Venue.name)
-        .join(Concert, Concert.venue_id == Venue.id)
-        .distinct()
-        .order_by(Venue.name)
-        .all()
-    )
-    return [row[0] for row in rows]
 
 
 @router.get("/cities", response_model=CitiesResponse)
@@ -52,3 +35,23 @@ def get_venues_stats(db: Session = Depends(get_db)):
     Returns 200 with an empty list (not an error) when there is no data.
     """
     return VenuesResponse(venues=get_distinct_venue_names(db))
+
+
+@router.get("/count", response_model=CountResponse)
+def get_count(db: Session = Depends(get_db)):
+    """Retrieve the total number of concerts, regardless of date."""
+    return {"count": get_concert_count(db)}
+
+
+@router.get("/upcoming-count", response_model=UpcomingCountResponse)
+def get_upcoming_count(
+    db: Session = Depends(get_db),
+    reference_time: datetime = Depends(get_reference_time),
+):
+    """Retrieve the count of concerts scheduled today or later.
+
+    A concert is upcoming when its calendar date (compared against
+    `reference_time`) is today or in the future; past concerts are
+    excluded from the count.
+    """
+    return {"count": get_upcoming_concert_count(db, reference_time)}

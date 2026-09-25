@@ -89,3 +89,26 @@ class TourResponse(BaseModel):
                 "description": "An amazing world tour featuring classic hits"
             }
         }
+
+
+class TourSummary(BaseModel):
+    """Schema for the tour summary API response."""
+
+    tour_id: int = Field(..., description="Unique tour identifier")
+    date_count: int = Field(..., description="Number of tour dates")
+    first_date: Optional[date] = Field(None, description="Earliest tour date")
+    last_date: Optional[date] = Field(None, description="Latest tour date")
+    distinct_city_count: int = Field(..., description="Number of distinct cities visited")
+
+    class Config:
+        """Pydantic configuration."""
+        orm_mode = True
+        schema_extra = {
+            "example": {
+                "tour_id": 1,
+                "date_count": 12,
+                "first_date": "2024-06-01",
+                "last_date": "2024-12-31",
+                "distinct_city_count": 9
+            }
+        }

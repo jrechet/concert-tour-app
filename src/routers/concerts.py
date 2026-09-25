@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session, joinedload
@@ -13,6 +14,7 @@ from sqlalchemy.orm import Session, joinedload
 from ..database import get_db, get_reference_time
 from ..models import Concert, LineupEntry, Tour, Venue
 from ..schemas import CancelConcertRequest, ConcertResponse, LineupEntryResponse
+from ..services.concerts_service import generate_concerts_csv
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
 api_router = APIRouter(prefix="/api/v1/concerts", tags=["concerts"])
@@ -27,6 +29,9 @@ def get_concerts(
     limit: int = Query(100, ge=1, le=1000),
     city: Optional[str] = Query(
         None, description="Filter concerts to venues whose city contains this text (case-insensitive)"
+    ),
+    venue: Optional[str] = Query(
+        None, description="Filter concerts to the venue whose name matches this text (case-insensitive)"
     ),
     artist_name: Optional[str] = Query(
         None, description="Filter concerts to tours whose artist name contains this text (case-insensitive)"
@@ -51,7 +56,11 @@ def get_concerts(
     When `city` is provided and non-blank, results are narrowed to concerts
     whose venue city contains that text (case-insensitive substring match)
     before pagination is applied; a blank value is treated the same as
-    omitting the filter. When `artist_name` is provided, results are narrowed to
+    omitting the filter. When `venue` is provided and non-blank, results are
+    narrowed to concerts whose venue name exactly matches that text
+    (case-insensitive) before pagination is applied; a blank value is
+    treated the same as omitting the filter, and a name with no matching
+    venue yields an empty list rather than an error. When `artist_name` is provided, results are narrowed to
     concerts whose tour artist name contains that text (case-insensitive
     substring match) before pagination is applied. When `include_cancelled`
     is false, cancelled concerts are excluded before pagination is applied;
@@ -70,10 +79,12 @@ def get_concerts(
         .order_by(is_past, Concert.date_time)
     )
 
-    if city:
-        query = query.join(Concert.venue).filter(
-            func.lower(Venue.city).contains(city.lower(), autoescape=True)
-        )
+    if city or venue:
+        query = query.join(Concert.venue)
+        if city:
+            query = query.filter(func.lower(Venue.city).contains(city.lower(), autoescape=True))
+        if venue:
+            query = query.filter(func.lower(Venue.name) == venue.lower())
 
     if artist_name is not None:
         query = query.join(Concert.tour).filter(func.lower(Tour.artist).contains(artist_name.lower()))
@@ -122,6 +133,20 @@ def get_upcoming_concerts(
         .all()
     )
     return concerts
+
+
+@api_router.get("/export.csv")
+def export_concerts_csv(db: Session = Depends(get_db)):
+    """Stream every concert as a CSV file with columns date, city, venue, tour.
+
+    Registered ahead of `/{concert_id}` so the literal `export.csv` path
+    segment isn't swallowed as a concert ID.
+    """
+    return StreamingResponse(
+        generate_concerts_csv(db),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=concerts.csv"},
+    )
 
 
 @api_router.get("/{concert_id}", response_model=ConcertResponse)
