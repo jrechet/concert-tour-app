@@ -5,6 +5,7 @@ Pydantic schemas for API request/response validation.
 from .tour import TourCreate, TourUpdate, TourResponse
 from .concert import ConcertCreate, ConcertUpdate, ConcertResponse, CancelConcertRequest
 from .lineup_entry import LineupEntryResponse
+from .stats import CitiesResponse, VenuesResponse
 
 __all__ = [
     "TourCreate",
@@ -15,4 +16,6 @@ __all__ = [
     "ConcertResponse",
     "CancelConcertRequest",
     "LineupEntryResponse",
+    "CitiesResponse",
+    "VenuesResponse",
 ]
