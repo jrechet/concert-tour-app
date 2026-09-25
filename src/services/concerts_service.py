@@ -2,13 +2,38 @@
 
 import csv
 import io
-from typing import Iterator
+from typing import Iterator, List
 
 from sqlalchemy.orm import Session, joinedload
 
 from ..models import Concert
 
 CSV_HEADER = ["date", "city", "venue", "tour"]
+
+
+def get_concerts_for_export(db: Session) -> List[dict]:
+    """Fetch every concert joined with its venue and tour, ordered by date.
+
+    Returns plain dicts (`date`, `city`, `venue`, `tour`) decoupled from the
+    HTTP layer, so this can be unit tested without going through the export
+    endpoint. Eager-loads `Concert.venue`/`Concert.tour` via `joinedload` to
+    avoid N+1 queries. Returns an empty list when there are no concerts.
+    """
+    concerts = (
+        db.query(Concert)
+        .options(joinedload(Concert.venue), joinedload(Concert.tour))
+        .order_by(Concert.date_time)
+        .all()
+    )
+    return [
+        {
+            "date": concert.date_time.date().isoformat(),
+            "city": concert.venue.city,
+            "venue": concert.venue.name,
+            "tour": concert.tour.name,
+        }
+        for concert in concerts
+    ]
 
 
 def generate_concerts_csv(db: Session) -> Iterator[str]:
@@ -27,21 +52,8 @@ def generate_concerts_csv(db: Session) -> Iterator[str]:
     buffer.seek(0)
     buffer.truncate(0)
 
-    concerts = (
-        db.query(Concert)
-        .options(joinedload(Concert.venue), joinedload(Concert.tour))
-        .order_by(Concert.date_time)
-        .all()
-    )
-    for concert in concerts:
-        writer.writerow(
-            [
-                concert.date_time.date().isoformat(),
-                concert.venue.city,
-                concert.venue.name,
-                concert.tour.name,
-            ]
-        )
+    for row in get_concerts_for_export(db):
+        writer.writerow([row["date"], row["city"], row["venue"], row["tour"]])
         yield buffer.getvalue()
         buffer.seek(0)
         buffer.truncate(0)
