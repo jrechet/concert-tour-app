@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session, joinedload
@@ -13,6 +14,7 @@ from sqlalchemy.orm import Session, joinedload
 from ..database import get_db, get_reference_time
 from ..models import Concert, LineupEntry, Tour, Venue
 from ..schemas import CancelConcertRequest, ConcertResponse, LineupEntryResponse
+from ..services.concerts_service import generate_concerts_csv
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
 api_router = APIRouter(prefix="/api/v1/concerts", tags=["concerts"])
@@ -131,6 +133,20 @@ def get_upcoming_concerts(
         .all()
     )
     return concerts
+
+
+@api_router.get("/export.csv")
+def export_concerts_csv(db: Session = Depends(get_db)):
+    """Stream every concert as a CSV file with columns date, city, venue, tour.
+
+    Registered ahead of `/{concert_id}` so the literal `export.csv` path
+    segment isn't swallowed as a concert ID.
+    """
+    return StreamingResponse(
+        generate_concerts_csv(db),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=concerts.csv"},
+    )
 
 
 @api_router.get("/{concert_id}", response_model=ConcertResponse)
