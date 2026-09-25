@@ -65,6 +65,12 @@ class Concert(Base):
         return remaining is not None and remaining <= 0
 
     @property
+    def is_sold_out(self):
+        """Alias for `sold_out` matching the `is_`-prefixed naming used by
+        `is_cancelled`/`is_almost_sold_out`, for API consumers."""
+        return self.sold_out
+
+    @property
     def is_almost_sold_out(self):
         """Whether fewer than `ALMOST_SOLD_OUT_THRESHOLD` of total tickets remain.
 

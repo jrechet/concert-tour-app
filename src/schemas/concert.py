@@ -117,6 +117,9 @@ class ConcertResponse(BaseModel):
         None, description="Tickets still available; null when the venue's capacity is unknown"
     )
     sold_out: bool = Field(..., description="Whether every ticket for this concert has been sold")
+    is_sold_out: bool = Field(
+        ..., description="Alias for `sold_out`, using the `is_`-prefixed naming of the other boolean fields"
+    )
     is_almost_sold_out: bool = Field(
         ..., description="Whether fewer than the configured threshold of tickets remain"
     )
@@ -141,6 +144,7 @@ class ConcertResponse(BaseModel):
                 "tickets_sold": 15000,
                 "remaining_tickets": 5000,
                 "sold_out": False,
+                "is_sold_out": False,
                 "is_almost_sold_out": True,
                 "is_cancelled": False,
                 "cancellation_reason": None
