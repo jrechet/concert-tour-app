@@ -28,6 +28,9 @@ def get_concerts(
     city: Optional[str] = Query(
         None, description="Filter concerts to venues whose city contains this text (case-insensitive)"
     ),
+    venue: Optional[str] = Query(
+        None, description="Filter concerts to venues whose name contains this text (case-insensitive)"
+    ),
     artist_name: Optional[str] = Query(
         None, description="Filter concerts to tours whose artist name contains this text (case-insensitive)"
     ),
@@ -51,7 +54,9 @@ def get_concerts(
     When `city` is provided and non-blank, results are narrowed to concerts
     whose venue city contains that text (case-insensitive substring match)
     before pagination is applied; a blank value is treated the same as
-    omitting the filter. When `artist_name` is provided, results are narrowed to
+    omitting the filter. When `venue` is provided and non-blank, results are
+    narrowed the same way by venue name instead of city; a blank value is
+    likewise treated as omitting the filter. When `artist_name` is provided, results are narrowed to
     concerts whose tour artist name contains that text (case-insensitive
     substring match) before pagination is applied. When `include_cancelled`
     is false, cancelled concerts are excluded before pagination is applied;
@@ -70,10 +75,12 @@ def get_concerts(
         .order_by(is_past, Concert.date_time)
     )
 
-    if city:
-        query = query.join(Concert.venue).filter(
-            func.lower(Venue.city).contains(city.lower(), autoescape=True)
-        )
+    if city or venue:
+        query = query.join(Concert.venue)
+        if city:
+            query = query.filter(func.lower(Venue.city).contains(city.lower(), autoescape=True))
+        if venue:
+            query = query.filter(func.lower(Venue.name).contains(venue.lower(), autoescape=True))
 
     if artist_name is not None:
         query = query.join(Concert.tour).filter(func.lower(Tour.artist).contains(artist_name.lower()))
