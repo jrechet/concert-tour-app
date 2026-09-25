@@ -132,6 +132,7 @@ class TestUpcomingConcerts:
             "tickets_sold",
             "remaining_tickets",
             "sold_out",
+            "is_sold_out",
             "is_almost_sold_out",
             "is_cancelled",
             "cancellation_reason",

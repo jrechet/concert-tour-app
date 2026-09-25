@@ -164,3 +164,68 @@ class TestRemainingTicketsOnGetEndpoints:
         data = response.json()
         assert data[0]["remaining_tickets"] == 0
         assert data[0]["sold_out"] is True
+
+
+class TestIsSoldOutOnGetEndpoints:
+    """`is_sold_out` mirrors `sold_out`, derived from each concert's real
+    venue relationship (tickets_sold vs. capacity)."""
+
+    def test_get_concerts_list_includes_is_sold_out_true_and_false(self, client, db_session):
+        """The list endpoint reports is_sold_out True for a fully sold
+        concert and False for one with tickets still available, each tied
+        to its own real venue fixture."""
+        tour = create_tour(
+            db_session,
+            name="Is Sold Out Tour",
+            artist="Test Artist",
+            start_date=(datetime.now() - timedelta(days=1)).date(),
+            end_date=(datetime.now() + timedelta(days=90)).date(),
+            status="active",
+        )
+        venues = create_venues(db_session, count=2)
+        create_concert(
+            db_session, tour, venues[0], day_offset=10, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=venues[0].capacity,
+        )
+        create_concert(
+            db_session, tour, venues[1], day_offset=20, ticket_price="60.00",
+            base_time=datetime.now(), tickets_sold=1,
+        )
+
+        response = client.get("/api/v1/concerts/")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 2
+        by_venue = {row["venue_id"]: row for row in data}
+        assert by_venue[venues[0].id]["is_sold_out"] is True
+        assert by_venue[venues[1].id]["is_sold_out"] is False
+
+    def test_get_concert_by_id_includes_is_sold_out_true(self, client, db_session):
+        """The detail endpoint reports is_sold_out True when tickets_sold
+        equals the venue's capacity."""
+        tour, venue = _seed_tour_and_venue(db_session)
+        concert = create_concert(
+            db_session, tour, venue, day_offset=10, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=venue.capacity,
+        )
+
+        response = client.get(f"/api/v1/concerts/{concert.id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == concert.id
+        assert data["is_sold_out"] is True
+
+    def test_get_concert_by_id_includes_is_sold_out_false(self, client, db_session):
+        """The detail endpoint reports is_sold_out False when tickets remain
+        available."""
+        tour, venue = _seed_tour_and_venue(db_session)
+        concert = create_concert(
+            db_session, tour, venue, day_offset=10, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=1,
+        )
+
+        response = client.get(f"/api/v1/concerts/{concert.id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == concert.id
+        assert data["is_sold_out"] is False

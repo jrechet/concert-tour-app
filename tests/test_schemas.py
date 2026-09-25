@@ -186,6 +186,7 @@ class TestConcertSchemas:
             "tickets_sold": 15000,
             "remaining_tickets": 5000,
             "sold_out": False,
+            "is_sold_out": False,
             "is_almost_sold_out": False,
             "is_cancelled": False,
             "days_until_concert": 30
@@ -196,6 +197,7 @@ class TestConcertSchemas:
         assert concert_response.venue_id == 1
         assert concert_response.remaining_tickets == 5000
         assert concert_response.sold_out is False
+        assert concert_response.is_sold_out is False
         assert concert_response.is_almost_sold_out is False
 
     def test_concert_response_sold_out(self):
@@ -209,6 +211,7 @@ class TestConcertSchemas:
             "tickets_sold": 20000,
             "remaining_tickets": 0,
             "sold_out": True,
+            "is_sold_out": True,
             "is_almost_sold_out": True,
             "is_cancelled": False,
             "days_until_concert": 30
@@ -216,6 +219,7 @@ class TestConcertSchemas:
         concert_response = ConcertResponse(**concert_data)
         assert concert_response.remaining_tickets == 0
         assert concert_response.sold_out is True
+        assert concert_response.is_sold_out is True
         assert concert_response.is_almost_sold_out is True
 
     def test_concert_response_unknown_capacity(self):
@@ -229,6 +233,7 @@ class TestConcertSchemas:
             "tickets_sold": 0,
             "remaining_tickets": None,
             "sold_out": False,
+            "is_sold_out": False,
             "is_almost_sold_out": False,
             "is_cancelled": False,
             "days_until_concert": 30
