@@ -32,3 +32,17 @@ class VenuesResponse(BaseModel):
                 "venues": ["Madison Square Garden", "The O2 Arena"]
             }
         }
+
+
+class UpcomingCountResponse(BaseModel):
+    """Schema wrapping the count of concerts scheduled today or later."""
+
+    count: int = Field(..., description="Number of concerts scheduled today or later")
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "count": 5
+            }
+        }
