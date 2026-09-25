@@ -34,6 +34,20 @@ class VenuesResponse(BaseModel):
         }
 
 
+class CountResponse(BaseModel):
+    """Schema wrapping the total number of concerts."""
+
+    count: int = Field(..., description="Total number of concerts")
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "count": 42
+            }
+        }
+
+
 class UpcomingCountResponse(BaseModel):
     """Schema wrapping the count of concerts scheduled today or later."""
 

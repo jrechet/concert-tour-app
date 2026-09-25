@@ -1,5 +1,5 @@
-"""Tests for GET /api/v1/stats/cities, GET /api/v1/stats/venues, and
-GET /api/v1/stats/upcoming-count."""
+"""Tests for GET /api/v1/stats/cities, GET /api/v1/stats/venues,
+GET /api/v1/stats/count, and GET /api/v1/stats/upcoming-count."""
 
 from datetime import datetime, timedelta
 
@@ -90,6 +90,40 @@ def test_get_stats_venues_returns_empty_list_when_no_concerts(client, db_session
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_get_count_returns_zero_when_no_concerts(client, db_session):
+    response = client.get("/api/v1/stats/count")
+
+    assert response.status_code == 200
+    assert response.json() == {"count": 0}
+
+
+def test_get_count_counts_all_concerts_regardless_of_date(client, db_session):
+    tour = _seed_tour(db_session)
+    venues = create_venues(db_session, count=4)
+    base_time = datetime.now()
+    day_offsets = [-30, -1, 0, 15]
+    for venue, offset in zip(venues, day_offsets):
+        create_concert(db_session, tour, venue, day_offset=offset, ticket_price="50.00", base_time=base_time)
+
+    response = client.get("/api/v1/stats/count")
+
+    assert response.status_code == 200
+    assert response.json() == {"count": len(day_offsets)}
+
+
+def test_get_count_response_shape(client, db_session):
+    tour = _seed_tour(db_session)
+    venue = create_venues(db_session, count=1)[0]
+    create_concert(db_session, tour, venue, day_offset=1, ticket_price="50.00", base_time=datetime.now())
+
+    response = client.get("/api/v1/stats/count")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body.keys()) == {"count"}
+    assert isinstance(body["count"], int)
 
 
 def test_get_upcoming_count_returns_zero_when_no_concerts(client, db_session):

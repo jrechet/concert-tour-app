@@ -29,6 +29,11 @@ def get_distinct_cities(db: Session) -> List[str]:
     return [row[0] for row in rows]
 
 
+def get_concert_count(db: Session) -> int:
+    """Return the total number of concerts, regardless of date."""
+    return db.query(Concert).count()
+
+
 def get_upcoming_concert_count(db: Session, reference_time: datetime) -> int:
     """Return the number of concerts scheduled today or later.
 

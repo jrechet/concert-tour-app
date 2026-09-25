@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db, get_reference_time
 from ..models import Concert, Venue
-from ..schemas import UpcomingCountResponse
-from ..services.stats_service import get_upcoming_concert_count
+from ..schemas import CountResponse, UpcomingCountResponse
+from ..services.stats_service import get_concert_count, get_upcoming_concert_count
 
 router = APIRouter(prefix="/api/v1/stats", tags=["stats"])
 
@@ -44,6 +44,12 @@ def get_stats_venues(db: Session = Depends(get_db)):
         .all()
     )
     return [row[0] for row in rows]
+
+
+@router.get("/count", response_model=CountResponse)
+def get_count(db: Session = Depends(get_db)):
+    """Retrieve the total number of concerts, regardless of date."""
+    return {"count": get_concert_count(db)}
 
 
 @router.get("/upcoming-count", response_model=UpcomingCountResponse)
