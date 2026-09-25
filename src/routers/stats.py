@@ -3,47 +3,38 @@ cities and venue names that currently host at least one concert, and the
 count of concerts scheduled today or later."""
 
 from datetime import datetime
-from typing import List
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from ..database import get_db, get_reference_time
-from ..models import Concert, Venue
-from ..schemas import CountResponse, UpcomingCountResponse
-from ..services.stats_service import get_concert_count, get_upcoming_concert_count
+from ..schemas import CitiesResponse, CountResponse, UpcomingCountResponse, VenuesResponse
+from ..services.stats_service import (
+    get_concert_count,
+    get_distinct_cities,
+    get_distinct_venue_names,
+    get_upcoming_concert_count,
+)
 
 router = APIRouter(prefix="/api/v1/stats", tags=["stats"])
 
 
-@router.get("/cities", response_model=List[str])
-def get_stats_cities(db: Session = Depends(get_db)):
-    """Retrieve the distinct list of cities hosting at least one concert,
-    sorted alphabetically.
+@router.get("/cities", response_model=CitiesResponse)
+def get_cities_stats(db: Session = Depends(get_db)):
+    """Retrieve the distinct, sorted list of cities with at least one concert.
+
+    Returns 200 with an empty list (not an error) when there is no data.
     """
-    rows = (
-        db.query(Venue.city)
-        .join(Concert, Concert.venue_id == Venue.id)
-        .distinct()
-        .order_by(Venue.city)
-        .all()
-    )
-    return [row[0] for row in rows]
+    return CitiesResponse(cities=get_distinct_cities(db))
 
 
-@router.get("/venues", response_model=List[str])
-def get_stats_venues(db: Session = Depends(get_db)):
-    """Retrieve the distinct list of venue names hosting at least one
-    concert, sorted alphabetically.
+@router.get("/venues", response_model=VenuesResponse)
+def get_venues_stats(db: Session = Depends(get_db)):
+    """Retrieve the distinct, sorted list of venue names with at least one concert.
+
+    Returns 200 with an empty list (not an error) when there is no data.
     """
-    rows = (
-        db.query(Venue.name)
-        .join(Concert, Concert.venue_id == Venue.id)
-        .distinct()
-        .order_by(Venue.name)
-        .all()
-    )
-    return [row[0] for row in rows]
+    return VenuesResponse(venues=get_distinct_venue_names(db))
 
 
 @router.get("/count", response_model=CountResponse)

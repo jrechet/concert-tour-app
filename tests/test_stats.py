@@ -30,7 +30,7 @@ def test_get_stats_cities_returns_distinct_sorted_cities(client, db_session):
     response = client.get("/api/v1/stats/cities")
 
     assert response.status_code == 200
-    assert response.json() == sorted(venue.city for venue in venues)
+    assert response.json() == {"cities": sorted(venue.city for venue in venues)}
 
 
 def test_get_stats_cities_excludes_cities_with_no_concerts(client, db_session):
@@ -45,14 +45,14 @@ def test_get_stats_cities_excludes_cities_with_no_concerts(client, db_session):
     response = client.get("/api/v1/stats/cities")
 
     assert response.status_code == 200
-    assert response.json() == ["Berlin"]
+    assert response.json() == {"cities": ["Berlin"]}
 
 
 def test_get_stats_cities_returns_empty_list_when_no_concerts(client, db_session):
     response = client.get("/api/v1/stats/cities")
 
     assert response.status_code == 200
-    assert response.json() == []
+    assert response.json() == {"cities": []}
 
 
 def test_get_stats_venues_returns_distinct_sorted_venues(client, db_session):
@@ -67,7 +67,7 @@ def test_get_stats_venues_returns_distinct_sorted_venues(client, db_session):
     response = client.get("/api/v1/stats/venues")
 
     assert response.status_code == 200
-    assert response.json() == sorted(venue.name for venue in venues)
+    assert response.json() == {"venues": sorted(venue.name for venue in venues)}
 
 
 def test_get_stats_venues_excludes_venues_with_no_concerts(client, db_session):
@@ -82,14 +82,14 @@ def test_get_stats_venues_excludes_venues_with_no_concerts(client, db_session):
     response = client.get("/api/v1/stats/venues")
 
     assert response.status_code == 200
-    assert response.json() == ["Arena One"]
+    assert response.json() == {"venues": ["Arena One"]}
 
 
 def test_get_stats_venues_returns_empty_list_when_no_concerts(client, db_session):
     response = client.get("/api/v1/stats/venues")
 
     assert response.status_code == 200
-    assert response.json() == []
+    assert response.json() == {"venues": []}
 
 
 def test_get_count_returns_zero_when_no_concerts(client, db_session):

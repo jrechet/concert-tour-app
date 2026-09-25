@@ -3,6 +3,7 @@ Pydantic schemas for stats API responses.
 """
 
 from typing import List
+
 from pydantic import BaseModel, Field
 
 
