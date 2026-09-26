@@ -70,6 +70,20 @@ def test_zero_or_negative_page_size_is_rejected(client, db_session):
     assert client.get("/api/v1/concerts/?page_size=-1").status_code == 422
 
 
+def test_non_integer_page_is_rejected(client, db_session):
+    _seed_concerts(db_session, 3)
+
+    assert client.get("/api/v1/concerts/?page=abc").status_code == 422
+    assert client.get("/api/v1/concerts/?page=1.5").status_code == 422
+
+
+def test_non_integer_page_size_is_rejected(client, db_session):
+    _seed_concerts(db_session, 3)
+
+    assert client.get("/api/v1/concerts/?page_size=abc").status_code == 422
+    assert client.get("/api/v1/concerts/?page_size=1.5").status_code == 422
+
+
 def test_total_count_reflects_filtered_set_not_full_table(client, db_session):
     tour, venues = _seed_two_cities(db_session)
     target, other = venues
