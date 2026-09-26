@@ -134,4 +134,5 @@ concert_tour.db
 *.db-journal
 *.db-wal
 *.db-shm
+*.sqlite-journal
 .DS_Store
