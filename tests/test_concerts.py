@@ -924,8 +924,9 @@ class TestRemainingTicketsQueryEfficiency:
         assert response.status_code == 200
         assert len(response.json()) == 9
 
+        # 1 query for the page of rows plus 1 for the X-Total-Count header.
         assert len(few_result_queries) == len(many_result_queries)
-        assert len(many_result_queries) == 1
+        assert len(many_result_queries) == 2
 
     def test_detail_endpoint_uses_single_query(self, client, db_session):
         tour, venue = _seed_tour_and_venue(db_session)

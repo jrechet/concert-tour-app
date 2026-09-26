@@ -5,12 +5,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session, joinedload
 
+from ..config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from ..database import get_db, get_reference_time
 from ..models import Concert, LineupEntry, Tour, Venue
 from ..schemas import CancelConcertRequest, ConcertResponse, LineupEntryResponse
@@ -26,8 +27,20 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 @api_router.get("/", response_model=List[ConcertResponse])
 def get_concerts(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
+    response: Response,
+    page: int = Query(1, ge=1, description="1-indexed page number"),
+    page_size: int = Query(
+        DEFAULT_PAGE_SIZE,
+        ge=1,
+        le=MAX_PAGE_SIZE,
+        description=f"Items per page, up to {MAX_PAGE_SIZE}",
+    ),
+    skip: Optional[int] = Query(
+        None, ge=0, description="Deprecated alias for offset; overrides `page` when given"
+    ),
+    limit: Optional[int] = Query(
+        None, ge=1, le=MAX_PAGE_SIZE, description="Deprecated alias for `page_size`; overrides it when given"
+    ),
     city: Optional[str] = Query(
         None, description="Filter concerts to venues whose city contains this text (case-insensitive)"
     ),
@@ -48,6 +61,15 @@ def get_concerts(
 ):
     """Retrieve all concerts with pagination, including remaining ticket
     counts and sold-out status derived from each concert's venue.
+
+    Pagination is 1-indexed via `page` (default 1) and `page_size` (default
+    `DEFAULT_PAGE_SIZE`, capped at `MAX_PAGE_SIZE`); requesting a `page_size`
+    above the cap, or a non-positive `page`/`page_size`, is rejected with a
+    422 rather than silently clamped. The total number of matching concerts
+    (after filters, before pagination) is returned in the `X-Total-Count`
+    response header. `skip`/`limit` remain as deprecated offset/limit
+    aliases for existing clients and, when given, take precedence over
+    `page`/`page_size`.
 
     Results are ordered chronologically by default: upcoming concerts
     (today or later, compared by calendar date against `reference_time`)
@@ -96,7 +118,11 @@ def get_concerts(
     if upcoming_only:
         query = query.filter(func.date(Concert.date_time) >= func.date(reference_time))
 
-    concerts = query.offset(skip).limit(limit).all()
+    response.headers["X-Total-Count"] = str(query.count())
+
+    offset = skip if skip is not None else (page - 1) * page_size
+    effective_limit = limit if limit is not None else page_size
+    concerts = query.offset(offset).limit(effective_limit).all()
     return concerts
 
 
