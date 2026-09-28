@@ -64,3 +64,34 @@ def test_occupancy_endpoint_returns_404_for_nonexistent_concert(client, db_sessi
 
     assert response.status_code == 404
     assert "not found" in response.json()["detail"].lower()
+
+
+def test_occupancy_endpoint_returns_zero_percentage_for_zero_tickets_sold(db_session, client):
+    concert = _build_concert(db_session, tickets_sold=0, capacity=20000)
+
+    response = client.get(f"/api/v1/concerts/{concert.id}/occupancy")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["tickets_sold"] == 0
+    assert data["capacity"] == 20000
+    assert data["percentage_sold"] == 0.0
+    assert data["percentage_sold"] is not None
+
+
+def test_occupancy_endpoint_returns_null_percentage_for_zero_capacity(db_session, client):
+    concert = _build_concert(db_session, tickets_sold=0, capacity=0)
+
+    response = client.get(f"/api/v1/concerts/{concert.id}/occupancy")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["tickets_sold"] == 0
+    assert data["capacity"] == 0
+    assert data["percentage_sold"] is None
+
+
+def test_occupancy_endpoint_returns_422_for_non_integer_concert_id(client, db_session):
+    response = client.get("/api/v1/concerts/not-an-id/occupancy")
+
+    assert response.status_code == 422
