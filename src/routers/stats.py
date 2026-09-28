@@ -3,14 +3,22 @@ cities and venue names that currently host at least one concert, and the
 count of concerts scheduled today or later."""
 
 from datetime import datetime
+from typing import List
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from ..database import get_db, get_reference_time
-from ..schemas import CitiesResponse, CountResponse, UpcomingCountResponse, VenuesResponse
+from ..schemas import (
+    CitiesResponse,
+    CountResponse,
+    CountryConcertCount,
+    UpcomingCountResponse,
+    VenuesResponse,
+)
 from ..services.stats_service import (
     get_concert_count,
+    get_concert_counts_by_country,
     get_distinct_cities,
     get_distinct_venue_names,
     get_upcoming_concert_count,
@@ -41,6 +49,21 @@ def get_venues_stats(db: Session = Depends(get_db)):
 def get_count(db: Session = Depends(get_db)):
     """Retrieve the total number of concerts, regardless of date."""
     return {"count": get_concert_count(db)}
+
+
+@router.get("/countries", response_model=List[CountryConcertCount])
+def get_countries_stats(db: Session = Depends(get_db)):
+    """Retrieve the number of non-cancelled concerts per country, ordered by
+    concert count descending.
+
+    Cancelled concerts are excluded from the counts. A country with zero
+    non-cancelled concerts (or no concerts at all) is omitted from the
+    response rather than appearing with a count of 0.
+    """
+    return [
+        CountryConcertCount(country=country, concert_count=count)
+        for country, count in get_concert_counts_by_country(db)
+    ]
 
 
 @router.get("/upcoming-count", response_model=UpcomingCountResponse)

@@ -91,6 +91,53 @@ def test_get_venues_returns_empty_list_when_no_concerts(client, db_session):
     assert response.json() == {"venues": []}
 
 
+def test_get_countries_returns_counts_ordered_descending_excluding_cancelled(client, db_session):
+    tour = _seed_tour(db_session)
+    venue_germany = Venue(name="Arena Berlin", city="Berlin", country="Germany", capacity=5000)
+    venue_france = Venue(name="Arena Paris", city="Paris", country="France", capacity=5000)
+    venue_italy = Venue(name="Arena Rome", city="Rome", country="Italy", capacity=5000)
+    db_session.add_all([venue_germany, venue_france, venue_italy])
+    db_session.commit()
+    for venue in (venue_germany, venue_france, venue_italy):
+        db_session.refresh(venue)
+    base_time = datetime.now()
+    for i in range(3):
+        create_concert(db_session, tour, venue_germany, day_offset=i, ticket_price="50.00", base_time=base_time)
+    for i in range(2):
+        create_concert(db_session, tour, venue_france, day_offset=10 + i, ticket_price="50.00", base_time=base_time)
+    create_concert(db_session, tour, venue_italy, day_offset=20, ticket_price="50.00", base_time=base_time)
+    # A cancelled concert in a fourth country must not appear in the response.
+    venue_spain = Venue(name="Arena Madrid", city="Madrid", country="Spain", capacity=5000)
+    db_session.add(venue_spain)
+    db_session.commit()
+    db_session.refresh(venue_spain)
+    create_concert(
+        db_session, tour, venue_spain, day_offset=30, ticket_price="50.00", base_time=base_time,
+        is_cancelled=True, cancellation_reason="Weather",
+    )
+    # A cancelled concert in an otherwise-active country must not be counted.
+    create_concert(
+        db_session, tour, venue_italy, day_offset=21, ticket_price="50.00", base_time=base_time,
+        is_cancelled=True, cancellation_reason="Artist illness",
+    )
+
+    response = client.get("/api/v1/stats/countries")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {"country": "Germany", "concert_count": 3},
+        {"country": "France", "concert_count": 2},
+        {"country": "Italy", "concert_count": 1},
+    ]
+
+
+def test_get_countries_returns_empty_list_when_no_concerts(client, db_session):
+    response = client.get("/api/v1/stats/countries")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
 def test_stats_endpoints_documented_in_openapi_schema(client):
     schema = client.get("/openapi.json").json()
 
@@ -103,3 +150,7 @@ def test_stats_endpoints_documented_in_openapi_schema(client):
     assert venues_get["responses"]["200"]["content"]["application/json"]["schema"]["$ref"] == (
         "#/components/schemas/VenuesResponse"
     )
+
+    countries_get = schema["paths"]["/api/v1/stats/countries"]["get"]
+    countries_schema = countries_get["responses"]["200"]["content"]["application/json"]["schema"]
+    assert countries_schema["items"]["$ref"] == "#/components/schemas/CountryConcertCount"
