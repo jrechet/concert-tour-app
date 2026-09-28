@@ -14,8 +14,16 @@ from sqlalchemy.orm import Session, joinedload
 from ..config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from ..database import get_db, get_reference_time
 from ..models import Concert, LineupEntry, Tour, Venue
-from ..schemas import CancelConcertRequest, ConcertResponse, LineupEntryResponse, OccupancyResponse
-from ..services.concerts_service import generate_concerts_csv, get_concert_occupancy
+from ..schemas import (
+    CancelConcertRequest,
+    ConcertNextResponse,
+    ConcertResponse,
+    LineupEntryResponse,
+    NextConcertCity,
+    NextConcertVenue,
+    OccupancyResponse,
+)
+from ..services.concerts_service import generate_concerts_csv, get_concert_occupancy, get_next_concert
 from ..services.concerts_service import get_upcoming_concerts as fetch_upcoming_concerts
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
@@ -153,6 +161,38 @@ def get_upcoming_concerts(
     excluded entirely rather than appended, unlike `GET /`.
     """
     return fetch_upcoming_concerts(db, reference_time)
+
+
+@api_router.get(
+    "/next",
+    response_model=ConcertNextResponse,
+    responses={
+        404: {
+            "description": "No upcoming, non-cancelled concert exists.",
+            "content": {"application/json": {"example": {"detail": "No upcoming concert"}}},
+        },
+    },
+)
+def get_next_concert_endpoint(
+    db: Session = Depends(get_db),
+    reference_time: datetime = Depends(get_reference_time),
+):
+    """Retrieve the soonest upcoming, non-cancelled concert, with its venue
+    and city nested.
+
+    Registered ahead of `/{concert_id}` so the literal `next` path segment
+    isn't swallowed as a concert ID. Returns 404 when no such concert exists.
+    """
+    concert = get_next_concert(db, reference_time)
+    if concert is None:
+        raise HTTPException(status_code=404, detail="No upcoming concert")
+    return ConcertNextResponse(
+        id=concert.id,
+        date_time=concert.date_time,
+        is_cancelled=concert.is_cancelled,
+        venue=NextConcertVenue(name=concert.venue.name, capacity=concert.venue.capacity),
+        city=NextConcertCity(name=concert.venue.city, country=concert.venue.country),
+    )
 
 
 @api_router.get("/export.csv")
