@@ -84,6 +84,21 @@ class TestNextConcert:
         assert payload["city"] == {"name": venues[2].city, "country": venues[2].country}
         assert set(payload.keys()) == {"id", "date_time", "is_cancelled", "venue", "city"}
 
+    def test_excludes_past_concert_and_returns_soonest_future_one(self, client, db_session):
+        venues = create_venues(db_session, count=2)
+        tour = create_tour(
+            db_session, "Reunion Tour", "Test Artist",
+            (REFERENCE_TIME - timedelta(days=60)).date(),
+            (REFERENCE_TIME + timedelta(days=30)).date(),
+            "active",
+        )
+        create_concert(db_session, tour, venues[0], day_offset=-3, ticket_price="80.00", base_time=REFERENCE_TIME)
+        soonest = create_concert(db_session, tour, venues[1], day_offset=10, ticket_price="80.00", base_time=REFERENCE_TIME)
+
+        response = client.get("/api/v1/concerts/next")
+        assert response.status_code == 200
+        assert response.json()["id"] == soonest.id
+
     def test_concert_at_exact_reference_time_is_included(self, client, db_session):
         venues = create_venues(db_session, count=1)
         tour = create_tour(
