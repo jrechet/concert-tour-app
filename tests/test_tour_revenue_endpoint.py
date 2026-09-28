@@ -49,3 +49,4 @@ class TestTourRevenueEndpoint:
     def test_revenue_not_found(self, client):
         response = client.get("/api/v1/tours/999999/revenue")
         assert response.status_code == 404
+        assert response.json() == {"detail": "Tour not found"}
