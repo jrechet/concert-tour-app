@@ -9,7 +9,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_reference_time
-from ..models import Concert
+from ..models import Concert, Venue
+from ..schemas.occupancy import OccupancyResponse
 
 CSV_HEADER = ["date", "city", "venue", "tour"]
 
@@ -56,6 +57,35 @@ def get_concerts_for_export(db: Session) -> List[dict]:
         }
         for concert in concerts
     ]
+
+
+def get_concert_occupancy(db: Session, concert_id: int) -> Optional[OccupancyResponse]:
+    """Compute ticket sales relative to venue capacity for a single concert.
+
+    Returns `None` when no concert with `concert_id` exists, so the router
+    can translate that into a 404. `capacity` and `percentage_sold` are
+    both null when the concert's venue has no capacity set; otherwise
+    `percentage_sold` is `tickets_sold / capacity * 100`, rounded to 1
+    decimal place.
+    """
+    row = (
+        db.query(Concert.tickets_sold, Venue.capacity)
+        .join(Venue, Concert.venue_id == Venue.id)
+        .filter(Concert.id == concert_id)
+        .first()
+    )
+    if row is None:
+        return None
+
+    tickets_sold, capacity = row
+    percentage_sold = round(tickets_sold / capacity * 100, 1) if capacity else None
+
+    return OccupancyResponse(
+        concert_id=concert_id,
+        tickets_sold=tickets_sold,
+        capacity=capacity,
+        percentage_sold=percentage_sold,
+    )
 
 
 def generate_concerts_csv(db: Session) -> Iterator[str]:
