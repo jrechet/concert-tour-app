@@ -14,7 +14,14 @@ from .concert import (
 )
 from .lineup_entry import LineupEntryResponse
 from .occupancy import OccupancyResponse
-from .stats import CitiesResponse, VenuesResponse, CountResponse, UpcomingCountResponse
+from .stats import (
+    CitiesResponse,
+    VenuesResponse,
+    CountResponse,
+    UpcomingCountResponse,
+    CountryConcertCount,
+    CountryConcertCountResponse,
+)
 
 __all__ = [
     "TourStatus",
@@ -35,4 +42,6 @@ __all__ = [
     "VenuesResponse",
     "CountResponse",
     "UpcomingCountResponse",
+    "CountryConcertCount",
+    "CountryConcertCountResponse",
 ]
