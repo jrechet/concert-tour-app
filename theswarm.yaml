@@ -3,6 +3,12 @@
 # router — which on this app are JSON responses, so the demo card showed
 # payloads instead of the dashboard the feature actually changed.
 demo:
+  # A database of its own for every demo server: the workspace's outlives
+  # cycles, and the demo used to show what QA's E2E runs left behind
+  # (tour 1 at "revenue 0.00, 0 concerts" on the tour-revenue demo).
+  command: "{python} -m uvicorn src.main:app --host 127.0.0.1 --port {port}"
+  env:
+    DATABASE_URL: "sqlite:///{tmp}/demo.db"
   pages:
     - "/dashboard"
     - "/"
