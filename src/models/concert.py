@@ -59,6 +59,19 @@ class Concert(Base):
         return max(self.venue.capacity - (self.tickets_sold or 0), 0)
 
     @property
+    def percentage_sold(self):
+        """Tickets sold as a percentage of venue capacity, rounded to 1
+        decimal place, mirroring `OccupancyResponse.percentage_sold`.
+
+        Returns None when the venue has no known (or zero) capacity, since
+        a percentage can't be meaningfully computed in either case.
+        """
+        capacity = self.venue.capacity if self.venue is not None else None
+        if not capacity:
+            return None
+        return round((self.tickets_sold or 0) / capacity * 100, 1)
+
+    @property
     def sold_out(self):
         """Whether every ticket for this concert has been sold."""
         remaining = self.remaining_tickets

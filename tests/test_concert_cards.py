@@ -50,6 +50,35 @@ def test_sold_out_when_tickets_sold_meets_capacity(db_session):
     assert concert.sold_out is True
 
 
+def test_percentage_sold_computed_from_tickets_sold_and_capacity(db_session):
+    venue = Venue(name="Percent Arena", city="Testville", country="USA", capacity=200)
+    db_session.add(venue)
+    db_session.commit()
+    db_session.refresh(venue)
+    tour = _make_tour(db_session, "Percentage Tour")
+
+    concert = create_concert(
+        db_session, tour, venue, day_offset=10, ticket_price="50.00",
+        base_time=datetime.now(), tickets_sold=75,
+    )
+
+    assert concert.percentage_sold == 37.5
+
+
+def test_percentage_sold_is_none_without_venue_capacity(db_session):
+    venue = Venue(name="Capacity Unknown Hall", city="Testville", country="USA", capacity=None)
+    db_session.add(venue)
+    db_session.commit()
+    db_session.refresh(venue)
+    tour = _make_tour(db_session, "No Capacity Tour")
+
+    concert = create_concert(
+        db_session, tour, venue, day_offset=5, ticket_price="40.00", base_time=datetime.now(),
+    )
+
+    assert concert.percentage_sold is None
+
+
 def test_remaining_tickets_is_none_without_venue_capacity(db_session):
     venue = Venue(name="Unknown Capacity Hall", city="Testville", country="USA", capacity=None)
     db_session.add(venue)
@@ -126,6 +155,36 @@ def test_dashboard_concerts_endpoint_shows_sold_out_badge_for_zero_capacity_venu
 
     assert response.status_code == 200
     assert "Sold Out" in response.text
+
+
+def test_dashboard_concerts_endpoint_shows_percentage_sold_when_capacity_known(client, db_session):
+    venue = create_venues(db_session, count=1)[0]
+    tour = _make_tour(db_session, "Percentage Card Tour")
+    create_concert(
+        db_session, tour, venue, day_offset=5, ticket_price="50.00",
+        base_time=datetime.now(), tickets_sold=venue.capacity // 2,
+    )
+
+    response = client.get("/api/v1/dashboard/concerts")
+
+    assert response.status_code == 200
+    assert "50.0% sold" in response.text
+    assert "Occupancy unknown" not in response.text
+
+
+def test_dashboard_concerts_endpoint_shows_unknown_occupancy_without_capacity(client, db_session):
+    venue = Venue(name="No Capacity Venue", city="Testville", country="USA", capacity=None)
+    db_session.add(venue)
+    db_session.commit()
+    db_session.refresh(venue)
+    tour = _make_tour(db_session, "Unknown Occupancy Tour")
+    create_concert(db_session, tour, venue, day_offset=5, ticket_price="50.00", base_time=datetime.now())
+
+    response = client.get("/api/v1/dashboard/concerts")
+
+    assert response.status_code == 200
+    assert "Occupancy unknown" in response.text
+    assert "% sold" not in response.text
 
 
 def test_dashboard_concerts_endpoint_escapes_venue_name(client, db_session):

@@ -289,6 +289,16 @@ a {
   color: var(--color-bg);
 }
 
+.occupancy-percentage {
+  color: var(--color-accent-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.occupancy-percentage-unknown {
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
 .concert-card-next {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 1px var(--color-accent);

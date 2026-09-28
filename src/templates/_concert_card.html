@@ -27,4 +27,9 @@
     {% elif concert.remaining_tickets is not none %}
     <span class="ticket-count">{{ concert.remaining_tickets }} tickets left</span>
     {% endif %}
+    {% if concert.percentage_sold is not none %}
+    <span class="occupancy-percentage">{{ concert.percentage_sold }}% sold</span>
+    {% else %}
+    <span class="occupancy-percentage occupancy-percentage-unknown">Occupancy unknown</span>
+    {% endif %}
 </article>
