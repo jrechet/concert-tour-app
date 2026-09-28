@@ -3,8 +3,17 @@ Pydantic schemas for Tour entities.
 """
 
 from datetime import date
+from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field, validator
+
+
+class TourStatus(str, Enum):
+    """Valid values for `Tour.status`, used for query-parameter validation."""
+
+    PLANNED = "planned"
+    ACTIVE = "active"
+    COMPLETED = "completed"
 
 
 class TourCreate(BaseModel):
