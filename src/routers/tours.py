@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db, get_reference_time
 from ..models import Concert, Tour, Venue
-from ..schemas import ConcertResponse, TourCreate, TourUpdate, TourResponse, TourSummary
+from ..schemas import ConcertResponse, TourCreate, TourUpdate, TourResponse, TourStatus, TourSummary
 
 router = APIRouter(prefix="/api/v1/tours", tags=["tours"])
 
@@ -34,10 +34,14 @@ def create_tour(tour: TourCreate, db: Session = Depends(get_db)):
 def get_tours(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
+    status: Optional[TourStatus] = Query(None, description="Filter tours by status"),
     db: Session = Depends(get_db)
 ):
-    """Retrieve all tours with pagination."""
-    tours = db.query(Tour).offset(skip).limit(limit).all()
+    """Retrieve all tours with pagination, optionally filtered by status."""
+    query = db.query(Tour)
+    if status is not None:
+        query = query.filter(Tour.status == status.value)
+    tours = query.offset(skip).limit(limit).all()
     return tours
 
 
