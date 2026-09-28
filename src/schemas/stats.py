@@ -61,3 +61,38 @@ class UpcomingCountResponse(BaseModel):
                 "count": 5
             }
         }
+
+
+class CountryConcertCount(BaseModel):
+    """Number of concerts hosted by a single country."""
+
+    country: str = Field(..., description="Country name")
+    concert_count: int = Field(..., description="Number of concerts hosted in this country")
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "country": "USA",
+                "concert_count": 12
+            }
+        }
+
+
+class CountryConcertCountResponse(BaseModel):
+    """Schema wrapping the per-country concert counts."""
+
+    countries: List[CountryConcertCount] = Field(
+        ..., description="Number of concerts per country"
+    )
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "countries": [
+                    {"country": "USA", "concert_count": 12},
+                    {"country": "France", "concert_count": 5},
+                ]
+            }
+        }
