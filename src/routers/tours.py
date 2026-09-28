@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db, get_reference_time
 from ..models import Concert, Tour, Venue
-from ..schemas import ConcertResponse, TourCreate, TourUpdate, TourResponse, TourStatus, TourSummary
+from ..schemas import ConcertResponse, TourCreate, TourUpdate, TourResponse, TourStatus, TourSummary, TourRevenue
+from ..services.tour_service import get_tour_revenue
 
 router = APIRouter(prefix="/api/v1/tours", tags=["tours"])
 
@@ -123,6 +124,18 @@ def get_tour_summary(tour_id: int, db: Session = Depends(get_db)):
         last_date=last_date.date() if last_date else None,
         distinct_city_count=distinct_city_count,
     )
+
+
+@router.get("/{tour_id}/revenue", response_model=TourRevenue)
+def get_tour_revenue_endpoint(tour_id: int, db: Session = Depends(get_db)):
+    """Retrieve total ticket revenue for a tour and the concert count it covers.
+
+    Returns 404 if the tour doesn't exist.
+    """
+    result = get_tour_revenue(db, tour_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Tour not found")
+    return TourRevenue(revenue=result.revenue, concert_count=result.concert_count)
 
 
 @router.put("/{tour_id}", response_model=TourResponse)

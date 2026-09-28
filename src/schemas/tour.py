@@ -3,6 +3,7 @@ Pydantic schemas for Tour entities.
 """
 
 from datetime import date
+from decimal import Decimal
 from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field, validator
@@ -119,5 +120,22 @@ class TourSummary(BaseModel):
                 "first_date": "2024-06-01",
                 "last_date": "2024-12-31",
                 "distinct_city_count": 9
+            }
+        }
+
+
+class TourRevenue(BaseModel):
+    """Schema for the tour revenue API response."""
+
+    revenue: Decimal = Field(..., description="Total ticket revenue for the tour")
+    concert_count: int = Field(..., description="Number of concerts the revenue was summed over")
+
+    class Config:
+        """Pydantic configuration."""
+        orm_mode = True
+        schema_extra = {
+            "example": {
+                "revenue": "13000.00",
+                "concert_count": 2
             }
         }
