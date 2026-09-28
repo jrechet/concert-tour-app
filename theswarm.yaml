@@ -6,3 +6,8 @@ demo:
   pages:
     - "/dashboard"
     - "/"
+  # Run once the demo server answers (TheSwarm `demo.seed`): an empty
+  # database gets a small tour schedule, so the dashboard and the pages a
+  # cycle adds (/api/v1/concerts/1/...) have something to show.
+  seed:
+    - "{python} scripts/seed_demo.py"
