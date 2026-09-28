@@ -19,11 +19,21 @@ CSV_HEADER = ["date", "city", "venue", "tour"]
 def apply_price_filter(query: Query, price_filter: ConcertPriceFilter) -> Query:
     """Apply the validated `min_price`/`max_price` filter to a concerts query.
 
-    Stub: `price_filter` has already been validated at the API layer
-    (non-negative, and `min_price` <= `max_price` when both are given), but
-    filtering by price is not implemented yet, so this is a no-op pass-through
-    pending that follow-up work.
+    `price_filter` has already been validated at the API layer (non-negative,
+    and `min_price` <= `max_price` when both are given). Both bounds are
+    inclusive. When either bound is given, concerts with no `ticket_price`
+    set are excluded entirely, since a null price can't be compared against
+    a threshold; when neither is given, the query is left untouched and such
+    concerts are still included.
     """
+    if price_filter.min_price is None and price_filter.max_price is None:
+        return query
+
+    query = query.filter(Concert.ticket_price.isnot(None))
+    if price_filter.min_price is not None:
+        query = query.filter(Concert.ticket_price >= price_filter.min_price)
+    if price_filter.max_price is not None:
+        query = query.filter(Concert.ticket_price <= price_filter.max_price)
     return query
 
 
