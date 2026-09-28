@@ -96,6 +96,57 @@ def test_get_tours_with_pagination():
     assert len(data) == 2
 
 
+def test_get_tours_filtered_by_status():
+    """Test filtering tours by status query parameter."""
+    for name, status in [
+        ("Planned Tour", "planned"),
+        ("Active Tour", "active"),
+        ("Completed Tour", "completed"),
+    ]:
+        tour_data = {
+            "name": name,
+            "artist": "Test Artist",
+            "start_date": "2024-01-01",
+            "end_date": "2024-12-31",
+            "status": status,
+        }
+        client.post("/api/v1/tours/", json=tour_data)
+
+    for status in ("planned", "active", "completed"):
+        response = client.get(f"/api/v1/tours/?status={status}")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["status"] == status
+
+
+def test_get_tours_without_status_returns_all():
+    """Test that omitting the status parameter returns all tours, unchanged."""
+    for name, status in [
+        ("Planned Tour", "planned"),
+        ("Active Tour", "active"),
+        ("Completed Tour", "completed"),
+    ]:
+        tour_data = {
+            "name": name,
+            "artist": "Test Artist",
+            "start_date": "2024-01-01",
+            "end_date": "2024-12-31",
+            "status": status,
+        }
+        client.post("/api/v1/tours/", json=tour_data)
+
+    response = client.get("/api/v1/tours/")
+    assert response.status_code == 200
+    assert len(response.json()) == 3
+
+
+def test_get_tours_invalid_status_returns_422():
+    """Test that an invalid status value returns a 422 validation error."""
+    response = client.get("/api/v1/tours/?status=bogus")
+    assert response.status_code == 422
+
+
 def test_get_tour_by_id():
     """Test getting a specific tour by ID."""
     tour_data = {
