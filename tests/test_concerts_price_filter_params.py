@@ -1,7 +1,6 @@
 """Tests for the `min_price`/`max_price` query params on GET
 /api/v1/concerts: validation (422 on an invalid range or a negative value)
-and pass-through acceptance (no filtering applied yet, existing behavior
-unaffected).
+and acceptance.
 """
 
 from datetime import datetime, timedelta
@@ -94,13 +93,71 @@ def test_price_params_are_documented_in_openapi_schema(client):
     assert "max_price" in param_names
 
 
-def test_price_filter_does_not_actually_filter_results_yet(client, db_session):
-    """Price filtering is a stub for now: providing a price range that
-    would exclude every concert still returns all of them."""
+def test_price_range_excludes_concerts_outside_bounds(client, db_session):
     tour, venue = _seed_tour_and_venue(db_session)
     create_concert(db_session, tour, venue, day_offset=10, ticket_price="50.00", base_time=datetime.now())
 
     response = client.get("/api/v1/concerts/", params={"min_price": 1000, "max_price": 2000})
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_min_price_bound_is_inclusive(client, db_session):
+    tour, venue = _seed_tour_and_venue(db_session)
+    create_concert(db_session, tour, venue, day_offset=10, ticket_price="50.00", base_time=datetime.now())
+
+    response = client.get("/api/v1/concerts/", params={"min_price": 50})
+
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+
+    response = client.get("/api/v1/concerts/", params={"min_price": 50.01})
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_max_price_bound_is_inclusive(client, db_session):
+    tour, venue = _seed_tour_and_venue(db_session)
+    create_concert(db_session, tour, venue, day_offset=10, ticket_price="50.00", base_time=datetime.now())
+
+    response = client.get("/api/v1/concerts/", params={"max_price": 50})
+
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+
+    response = client.get("/api/v1/concerts/", params={"max_price": 49.99})
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_null_price_concert_excluded_when_min_price_given(client, db_session):
+    tour, venue = _seed_tour_and_venue(db_session)
+    create_concert(db_session, tour, venue, day_offset=10, ticket_price=None, base_time=datetime.now())
+
+    response = client.get("/api/v1/concerts/", params={"min_price": 0})
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_null_price_concert_excluded_when_max_price_given(client, db_session):
+    tour, venue = _seed_tour_and_venue(db_session)
+    create_concert(db_session, tour, venue, day_offset=10, ticket_price=None, base_time=datetime.now())
+
+    response = client.get("/api/v1/concerts/", params={"max_price": 1000})
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_null_price_concert_included_when_no_price_filter_given(client, db_session):
+    tour, venue = _seed_tour_and_venue(db_session)
+    create_concert(db_session, tour, venue, day_offset=10, ticket_price=None, base_time=datetime.now())
+
+    response = client.get("/api/v1/concerts/")
 
     assert response.status_code == 200
     assert len(response.json()) == 1

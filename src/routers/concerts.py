@@ -124,8 +124,11 @@ def get_concerts(
 
     `min_price`/`max_price` are accepted and validated (each must be >= 0,
     and `min_price` may not exceed `max_price` when both are given, or the
-    request is rejected with a 422) but not yet applied to the results —
-    actual price filtering is a follow-up.
+    request is rejected with a 422) and applied to the results as an
+    inclusive range before pagination. Concerts with no `ticket_price` set
+    are excluded whenever either bound is given, since a null price can't be
+    compared against a threshold; when neither bound is given, such concerts
+    are still included, unchanged from prior behavior.
     """
     is_past = case(
         (func.date(Concert.date_time) < func.date(reference_time), 1),

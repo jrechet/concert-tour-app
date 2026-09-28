@@ -64,7 +64,7 @@ def create_concert(
         tour_id=tour.id,
         venue_id=venue.id,
         date_time=base_time + timedelta(days=day_offset),
-        ticket_price=Decimal(ticket_price),
+        ticket_price=Decimal(ticket_price) if ticket_price is not None else None,
         tickets_sold=tickets_sold,
         is_cancelled=is_cancelled,
         cancellation_reason=cancellation_reason,
