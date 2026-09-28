@@ -7,7 +7,7 @@ listing every venue in the table).
 """
 
 from datetime import datetime
-from typing import List
+from typing import List, Tuple
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -27,6 +27,25 @@ def get_distinct_cities(db: Session) -> List[str]:
         .all()
     )
     return [row[0] for row in rows]
+
+
+def get_concert_counts_by_country(db: Session) -> List[Tuple[str, int]]:
+    """Return `(country, concert_count)` tuples for non-cancelled concerts,
+    grouped by the hosting venue's country and ordered by count descending.
+
+    A country whose concerts are all cancelled (or that hosts no concerts
+    at all) is absent from the result, rather than appearing with a count
+    of 0.
+    """
+    rows = (
+        db.query(Venue.country, func.count(Concert.id).label("concert_count"))
+        .join(Concert, Concert.venue_id == Venue.id)
+        .filter(Concert.is_cancelled.is_(False))
+        .group_by(Venue.country)
+        .order_by(func.count(Concert.id).desc())
+        .all()
+    )
+    return [(row[0], row[1]) for row in rows]
 
 
 def get_concert_count(db: Session) -> int:
