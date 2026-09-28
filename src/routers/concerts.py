@@ -6,8 +6,10 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import StreamingResponse
 from fastapi.templating import Jinja2Templates
+from pydantic import ValidationError
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session, joinedload
 
@@ -17,13 +19,14 @@ from ..models import Concert, LineupEntry, Tour, Venue
 from ..schemas import (
     CancelConcertRequest,
     ConcertNextResponse,
+    ConcertPriceFilter,
     ConcertResponse,
     LineupEntryResponse,
     NextConcertCity,
     NextConcertVenue,
     OccupancyResponse,
 )
-from ..services.concerts_service import generate_concerts_csv, get_concert_occupancy, get_next_concert
+from ..services.concerts_service import apply_price_filter, generate_concerts_csv, get_concert_occupancy, get_next_concert
 from ..services.concerts_service import get_upcoming_concerts as fetch_upcoming_concerts
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
@@ -31,6 +34,24 @@ api_router = APIRouter(prefix="/api/v1/concerts", tags=["concerts"])
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+
+def get_price_filter(
+    min_price: Optional[float] = Query(None, ge=0, description="Only include concerts priced at or above this amount"),
+    max_price: Optional[float] = Query(None, ge=0, description="Only include concerts priced at or below this amount"),
+) -> ConcertPriceFilter:
+    """Validate and bundle the `min_price`/`max_price` query params.
+
+    Runs as a FastAPI dependency, ahead of the endpoint body, so an invalid
+    combination (`min_price` above `max_price`) is rejected with a standard
+    422 validation error rather than the endpoint having to check for it.
+    """
+    try:
+        return ConcertPriceFilter(min_price=min_price, max_price=max_price)
+    except ValidationError as exc:
+        raise RequestValidationError(
+            [{**error, "loc": ("query", *error["loc"])} for error in exc.errors()]
+        )
 
 
 @api_router.get("/", response_model=List[ConcertResponse])
@@ -64,6 +85,7 @@ def get_concerts(
     upcoming_only: bool = Query(
         False, description="When true, only concerts today or later are returned, soonest first, and past concerts are excluded rather than appended"
     ),
+    price_filter: ConcertPriceFilter = Depends(get_price_filter),
     db: Session = Depends(get_db),
     reference_time: datetime = Depends(get_reference_time),
 ):
@@ -99,6 +121,11 @@ def get_concerts(
     `upcoming_only` is true, past concerts are excluded entirely (rather than
     appended after upcoming ones), so the soonest concert is always first;
     it defaults to false so existing clients see no change in behavior.
+
+    `min_price`/`max_price` are accepted and validated (each must be >= 0,
+    and `min_price` may not exceed `max_price` when both are given, or the
+    request is rejected with a 422) but not yet applied to the results —
+    actual price filtering is a follow-up.
     """
     is_past = case(
         (func.date(Concert.date_time) < func.date(reference_time), 1),
@@ -125,6 +152,8 @@ def get_concerts(
 
     if upcoming_only:
         query = query.filter(func.date(Concert.date_time) >= func.date(reference_time))
+
+    query = apply_price_filter(query, price_filter)
 
     response.headers["X-Total-Count"] = str(query.count())
 

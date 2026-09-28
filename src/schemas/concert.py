@@ -4,7 +4,7 @@ Pydantic schemas for Concert entities.
 
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, root_validator, validator
 from decimal import Decimal
 
 
@@ -90,6 +90,28 @@ class CancelConcertRequest(BaseModel):
                 "reason": "Artist illness",
             }
         }
+
+
+class ConcertPriceFilter(BaseModel):
+    """Query-parameter validation for the `min_price`/`max_price` filters on
+    the concerts list endpoint.
+
+    Cross-field validation (rejecting `min_price > max_price`) happens here,
+    at the validation layer, so FastAPI reports it as a standard 422
+    validation error rather than the business logic having to raise one.
+    """
+
+    min_price: Optional[float] = Field(None, ge=0, description="Minimum ticket price to include")
+    max_price: Optional[float] = Field(None, ge=0, description="Maximum ticket price to include")
+
+    @root_validator(skip_on_failure=True)
+    def validate_price_range(cls, values):
+        """Reject a `min_price` above `max_price` when both are given."""
+        min_price = values.get("min_price")
+        max_price = values.get("max_price")
+        if min_price is not None and max_price is not None and min_price > max_price:
+            raise ValueError("min_price must not be greater than max_price")
+        return values
 
 
 class NextConcertVenue(BaseModel):

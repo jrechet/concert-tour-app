@@ -6,13 +6,25 @@ from datetime import datetime
 from typing import Iterator, List, Optional
 
 from sqlalchemy import func
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Query, Session, joinedload
 
 from ..database import get_reference_time
 from ..models import Concert, Venue
+from ..schemas.concert import ConcertPriceFilter
 from ..schemas.occupancy import OccupancyResponse
 
 CSV_HEADER = ["date", "city", "venue", "tour"]
+
+
+def apply_price_filter(query: Query, price_filter: ConcertPriceFilter) -> Query:
+    """Apply the validated `min_price`/`max_price` filter to a concerts query.
+
+    Stub: `price_filter` has already been validated at the API layer
+    (non-negative, and `min_price` <= `max_price` when both are given), but
+    filtering by price is not implemented yet, so this is a no-op pass-through
+    pending that follow-up work.
+    """
+    return query
 
 
 def get_upcoming_concerts(db: Session, reference_time: Optional[datetime] = None) -> List[Concert]:
