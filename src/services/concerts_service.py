@@ -34,6 +34,26 @@ def get_upcoming_concerts(db: Session, reference_time: Optional[datetime] = None
     )
 
 
+def get_next_concert(db: Session, reference_time: Optional[datetime] = None) -> Optional[Concert]:
+    """Return the soonest upcoming, non-cancelled concert, or `None`.
+
+    A concert is eligible when its exact `date_time` is at or after
+    `reference_time` (defaulting to `get_reference_time()` when omitted)
+    and it has not been cancelled. Eager-loads `Concert.venue` via
+    `joinedload` to avoid N+1 queries.
+    """
+    if reference_time is None:
+        reference_time = get_reference_time()
+    return (
+        db.query(Concert)
+        .options(joinedload(Concert.venue))
+        .filter(Concert.date_time >= reference_time)
+        .filter(Concert.is_cancelled.is_(False))
+        .order_by(Concert.date_time)
+        .first()
+    )
+
+
 def get_concerts_for_export(db: Session) -> List[dict]:
     """Fetch every concert joined with its venue and tour, ordered by date.
 

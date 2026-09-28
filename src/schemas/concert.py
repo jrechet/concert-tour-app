@@ -92,6 +92,57 @@ class CancelConcertRequest(BaseModel):
         }
 
 
+class NextConcertVenue(BaseModel):
+    """Nested venue details embedded in `ConcertNextResponse`."""
+
+    name: str = Field(..., description="Venue name")
+    capacity: Optional[int] = Field(None, description="Venue capacity")
+
+    class Config:
+        """Pydantic configuration."""
+        orm_mode = True
+
+
+class NextConcertCity(BaseModel):
+    """Nested city details embedded in `ConcertNextResponse`.
+
+    The `Venue` model stores `city`/`country` as plain string columns
+    rather than a separate City entity, so these are sourced from the
+    concert's venue rather than a distinct relationship.
+    """
+
+    name: str = Field(..., description="City name")
+    country: str = Field(..., description="Country name")
+
+    class Config:
+        """Pydantic configuration."""
+        orm_mode = True
+
+
+class ConcertNextResponse(BaseModel):
+    """Schema for the next upcoming, non-cancelled concert, with its
+    venue and city eagerly loaded and nested."""
+
+    id: int = Field(..., description="Unique concert identifier")
+    date_time: datetime = Field(..., description="Concert date and time")
+    is_cancelled: bool = Field(..., description="Whether this concert has been cancelled")
+    venue: NextConcertVenue = Field(..., description="Venue hosting this concert")
+    city: NextConcertCity = Field(..., description="City where this concert takes place")
+
+    class Config:
+        """Pydantic configuration."""
+        orm_mode = True
+        schema_extra = {
+            "example": {
+                "id": 1,
+                "date_time": "2024-07-15T20:00:00",
+                "is_cancelled": False,
+                "venue": {"name": "Madison Square Garden", "capacity": 20000},
+                "city": {"name": "New York", "country": "USA"},
+            }
+        }
+
+
 class ConcertResponse(BaseModel):
     """Schema for concert API responses.
 
