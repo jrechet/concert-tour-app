@@ -33,6 +33,7 @@ class TestTourRevenueEndpoint:
         response = client.get(f"/api/v1/tours/{tour.id}/revenue")
         assert response.status_code == 200
         data = response.json()
+        # 3 concerts were created, but 1 is cancelled, so it must not count.
         assert data["concert_count"] == 2
         assert float(data["revenue"]) == 80.00 * 100 + 120.00 * 50
 

@@ -135,7 +135,7 @@ def get_tour_revenue_endpoint(tour_id: int, db: Session = Depends(get_db)):
     result = get_tour_revenue(db, tour_id)
     if result is None:
         raise HTTPException(status_code=404, detail="Tour not found")
-    return TourRevenue(revenue=result.revenue, concert_count=result.concert_count)
+    return result
 
 
 @router.put("/{tour_id}", response_model=TourResponse)
