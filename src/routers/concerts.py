@@ -14,8 +14,8 @@ from sqlalchemy.orm import Session, joinedload
 from ..config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from ..database import get_db, get_reference_time
 from ..models import Concert, LineupEntry, Tour, Venue
-from ..schemas import CancelConcertRequest, ConcertResponse, LineupEntryResponse
-from ..services.concerts_service import generate_concerts_csv
+from ..schemas import CancelConcertRequest, ConcertResponse, LineupEntryResponse, OccupancyResponse
+from ..services.concerts_service import generate_concerts_csv, get_concert_occupancy
 from ..services.concerts_service import get_upcoming_concerts as fetch_upcoming_concerts
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
@@ -249,6 +249,19 @@ def get_concert_lineup(
         .all()
     )
     return entries
+
+
+@api_router.get("/{concert_id}/occupancy", response_model=OccupancyResponse)
+def get_concert_occupancy_endpoint(concert_id: int, db: Session = Depends(get_db)):
+    """Retrieve ticket sales relative to venue capacity for a concert.
+
+    Returns 404 when the concert doesn't exist. `capacity` and
+    `percentage_sold` are null when the concert's venue has no capacity set.
+    """
+    occupancy = get_concert_occupancy(db, concert_id)
+    if occupancy is None:
+        raise HTTPException(status_code=404, detail="Concert not found")
+    return occupancy
 
 
 @router.get("/concerts")
