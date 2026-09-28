@@ -251,12 +251,52 @@ def get_concert_lineup(
     return entries
 
 
-@api_router.get("/{concert_id}/occupancy", response_model=OccupancyResponse)
+@api_router.get(
+    "/{concert_id}/occupancy",
+    response_model=OccupancyResponse,
+    responses={
+        200: {
+            "description": "Ticket sales relative to venue capacity for the concert.",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "known_capacity": {
+                            "summary": "Venue capacity is known",
+                            "value": {
+                                "concert_id": 1,
+                                "tickets_sold": 15000,
+                                "capacity": 20000,
+                                "percentage_sold": 75.0,
+                            },
+                        },
+                        "unknown_capacity": {
+                            "summary": "Venue capacity is not set",
+                            "value": {
+                                "concert_id": 2,
+                                "tickets_sold": 500,
+                                "capacity": None,
+                                "percentage_sold": None,
+                            },
+                        },
+                    }
+                }
+            },
+        },
+        404: {
+            "description": "No concert exists with the given `concert_id`.",
+            "content": {
+                "application/json": {"example": {"detail": "Concert not found"}}
+            },
+        },
+    },
+)
 def get_concert_occupancy_endpoint(concert_id: int, db: Session = Depends(get_db)):
     """Retrieve ticket sales relative to venue capacity for a concert.
 
     Returns 404 when the concert doesn't exist. `capacity` and
     `percentage_sold` are null when the concert's venue has no capacity set.
+    A venue capacity of 0 is treated the same as unknown, since a
+    percentage can't be computed without dividing by zero.
     """
     occupancy = get_concert_occupancy(db, concert_id)
     if occupancy is None:
