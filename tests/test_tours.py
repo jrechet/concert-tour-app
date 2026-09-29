@@ -365,6 +365,48 @@ def test_search_tours_by_artist():
     assert data[0]["artist"] == "Aurora Belle"
 
 
+@pytest.mark.parametrize("query", ["AURORA", "aurora", "AuRoRa"])
+def test_search_tours_by_artist_case_insensitive_various_cases(query):
+    """Searching matches regardless of the case of the query string."""
+    client.post("/api/v1/tours/", json={
+        "name": "World Tour 2024",
+        "artist": "Aurora Belle",
+        "start_date": "2024-01-01",
+        "end_date": "2024-12-31",
+        "status": "planned",
+    })
+
+    response = client.get(f"/api/v1/tours/search?artist={query}")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["artist"] == "Aurora Belle"
+
+
+def test_search_tours_by_artist_substring_mid_word():
+    """A substring taken from the middle of an artist name still matches."""
+    client.post("/api/v1/tours/", json={
+        "name": "World Tour 2024",
+        "artist": "Aurora Belle",
+        "start_date": "2024-01-01",
+        "end_date": "2024-12-31",
+        "status": "planned",
+    })
+    client.post("/api/v1/tours/", json={
+        "name": "Other Tour",
+        "artist": "Someone Else",
+        "start_date": "2024-01-01",
+        "end_date": "2024-12-31",
+        "status": "planned",
+    })
+
+    response = client.get("/api/v1/tours/search?artist=ora Be")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["artist"] == "Aurora Belle"
+
+
 def test_search_tours_by_artist_no_matches():
     """Searching by an artist with no matches returns an empty list."""
     client.post("/api/v1/tours/", json={
