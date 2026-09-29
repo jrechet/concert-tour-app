@@ -8,7 +8,17 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ..database import get_db, get_reference_time
 from ..models import Concert, Tour, Venue
-from ..schemas import ConcertResponse, TourCreate, TourUpdate, TourResponse, TourStatus, TourSummary, TourRevenue
+from ..schemas import (
+    CancelTourRequest,
+    CancelTourResponse,
+    ConcertResponse,
+    TourCreate,
+    TourUpdate,
+    TourResponse,
+    TourStatus,
+    TourSummary,
+    TourRevenue,
+)
 from ..services.calendar_service import build_tour_calendar
 from ..services.tour_service import get_tour_revenue
 
@@ -161,6 +171,43 @@ def get_tour_revenue_endpoint(tour_id: int, db: Session = Depends(get_db)):
     if result is None:
         raise HTTPException(status_code=404, detail="Tour not found")
     return result
+
+
+@router.post("/{tour_id}/cancel", response_model=CancelTourResponse)
+def cancel_tour(
+    tour_id: int,
+    payload: CancelTourRequest,
+    db: Session = Depends(get_db),
+    reference_time: datetime = Depends(get_reference_time),
+):
+    """Cancel every upcoming, not-yet-cancelled concert on a tour.
+
+    Returns 404 if the tour doesn't exist. Past concerts and concerts
+    already marked cancelled are left untouched. A concert scheduled on
+    the same calendar day as `reference_time` is treated as upcoming
+    (the same-day boundary is inclusive). Returns the count of
+    concerts newly cancelled by this call.
+    """
+    tour_exists = db.query(Tour.id).filter(Tour.id == tour_id).first()
+    if not tour_exists:
+        raise HTTPException(status_code=404, detail="Tour not found")
+
+    concerts = (
+        db.query(Concert)
+        .filter(
+            Concert.tour_id == tour_id,
+            Concert.is_cancelled.is_(False),
+            func.date(Concert.date_time) >= func.date(reference_time),
+        )
+        .all()
+    )
+
+    for concert in concerts:
+        concert.is_cancelled = True
+        concert.cancellation_reason = payload.reason
+
+    db.commit()
+    return CancelTourResponse(cancelled_count=len(concerts))
 
 
 @router.put("/{tour_id}", response_model=TourResponse)
