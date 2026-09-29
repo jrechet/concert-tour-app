@@ -408,6 +408,7 @@ def get_dashboard_concerts(
     upcoming_only: bool = Query(
         False, description="When true, only concerts today or later are returned, soonest first, for the public-facing view"
     ),
+    show_past: bool = Depends(coerce_show_past),
     db: Session = Depends(get_db),
     reference_time: datetime = Depends(get_reference_time),
 ):
@@ -425,7 +426,11 @@ def get_dashboard_concerts(
     When `upcoming_only` is true, past concerts are excluded and the list is
     ordered soonest first, so the first card is always the next upcoming
     show; the template highlights it accordingly. Defaults to false so
-    existing callers see no change in behavior.
+    existing callers see no change in behavior. When `show_past` is also
+    true (via the "Show past concerts" toggle), it overrides
+    `upcoming_only`'s date filter so past concerts are included again,
+    still ordered chronologically; the "Next Show" badge is then withheld
+    since the first card may no longer be an upcoming show.
     """
     query = db.query(Concert).options(joinedload(Concert.venue)).order_by(Concert.date_time)
 
@@ -435,12 +440,17 @@ def get_dashboard_concerts(
     if not include_cancelled:
         query = query.filter(Concert.is_cancelled.is_(False))
 
-    if upcoming_only:
+    if upcoming_only and not show_past:
         query = query.filter(func.date(Concert.date_time) >= func.date(reference_time))
 
     concerts = query.all()
     return templates.TemplateResponse(
         request,
         "dashboard_concerts.html",
-        {"concerts": concerts, "upcoming_only": upcoming_only, "reference_time": reference_time},
+        {
+            "concerts": concerts,
+            "upcoming_only": upcoming_only,
+            "show_past": show_past,
+            "reference_time": reference_time,
+        },
     )

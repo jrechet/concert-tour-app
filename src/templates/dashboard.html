@@ -92,7 +92,7 @@
                        aria-label="Search concerts by artist name"
                        hx-get="/api/v1/dashboard/concerts?upcoming_only=true"
                        hx-trigger="keyup changed delay:300ms, search"
-                       hx-include="#hide-cancelled-checkbox"
+                       hx-include="#hide-cancelled-checkbox, #show-past-checkbox"
                        hx-target="#calendar-grid"
                        hx-swap="innerHTML">
                 <label class="concert-hide-cancelled-label">
@@ -102,10 +102,22 @@
                            value="false"
                            hx-get="/api/v1/dashboard/concerts?upcoming_only=true"
                            hx-trigger="change"
-                           hx-include="#artist-search-input"
+                           hx-include="#artist-search-input, #show-past-checkbox"
                            hx-target="#calendar-grid"
                            hx-swap="innerHTML">
                     Masquer les dates annulées
+                </label>
+                <label class="concert-show-past-label">
+                    <input type="checkbox"
+                           id="show-past-checkbox"
+                           name="show_past"
+                           value="true"
+                           hx-get="/api/v1/dashboard/concerts?upcoming_only=true"
+                           hx-trigger="change"
+                           hx-include="#artist-search-input, #hide-cancelled-checkbox"
+                           hx-target="#calendar-grid"
+                           hx-swap="innerHTML">
+                    Show past concerts
                 </label>
             </div>
 
