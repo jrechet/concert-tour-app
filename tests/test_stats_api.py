@@ -138,6 +138,36 @@ def test_get_countries_returns_empty_list_when_no_concerts(client, db_session):
     assert response.json() == []
 
 
+def test_get_prices_returns_lowest_average_highest_for_eligible_concerts(client, db_session):
+    tour = _seed_tour(db_session)
+    venues = create_venues(db_session, count=3)
+    base_time = datetime.now()
+    create_concert(db_session, tour, venues[0], day_offset=1, ticket_price="50.00", base_time=base_time)
+    create_concert(db_session, tour, venues[1], day_offset=2, ticket_price="100.00", base_time=base_time)
+    create_concert(db_session, tour, venues[2], day_offset=3, ticket_price="150.00", base_time=base_time)
+    # A past concert must not affect the stats.
+    create_concert(db_session, tour, venues[0], day_offset=-10, ticket_price="1.00", base_time=base_time)
+    # A cancelled concert must not affect the stats.
+    create_concert(
+        db_session, tour, venues[1], day_offset=4, ticket_price="9999.00", base_time=base_time,
+        is_cancelled=True, cancellation_reason="Weather",
+    )
+    # A concert with no ticket price must not affect the stats.
+    create_concert(db_session, tour, venues[2], day_offset=5, ticket_price=None, base_time=base_time)
+
+    response = client.get("/api/v1/stats/prices")
+
+    assert response.status_code == 200
+    assert response.json() == {"lowest": 50.0, "average": 100.0, "highest": 150.0}
+
+
+def test_get_prices_returns_nulls_when_no_eligible_concerts(client, db_session):
+    response = client.get("/api/v1/stats/prices")
+
+    assert response.status_code == 200
+    assert response.json() == {"lowest": None, "average": None, "highest": None}
+
+
 def test_stats_endpoints_documented_in_openapi_schema(client):
     schema = client.get("/openapi.json").json()
 
@@ -154,3 +184,8 @@ def test_stats_endpoints_documented_in_openapi_schema(client):
     countries_get = schema["paths"]["/api/v1/stats/countries"]["get"]
     countries_schema = countries_get["responses"]["200"]["content"]["application/json"]["schema"]
     assert countries_schema["items"]["$ref"] == "#/components/schemas/CountryConcertCount"
+
+    prices_get = schema["paths"]["/api/v1/stats/prices"]["get"]
+    assert prices_get["responses"]["200"]["content"]["application/json"]["schema"]["$ref"] == (
+        "#/components/schemas/PriceStatsResponse"
+    )
