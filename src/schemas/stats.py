@@ -2,7 +2,7 @@
 Pydantic schemas for stats API responses.
 """
 
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -129,5 +129,28 @@ class MonthlyConcertCountResponse(BaseModel):
                     {"month": "2026-01", "count": 7},
                     {"month": "2026-02", "count": 3},
                 ]
+            }
+        }
+
+
+class PriceStatsResponse(BaseModel):
+    """Schema wrapping ticket price statistics over upcoming, non-cancelled
+    concerts with a known price.
+
+    All three fields are `None` when there are no eligible concerts, rather
+    than 0, since 0 would misleadingly imply a real price of zero.
+    """
+
+    lowest: Optional[float] = Field(..., description="Lowest ticket price, or null if no eligible concerts")
+    average: Optional[float] = Field(..., description="Average ticket price, or null if no eligible concerts")
+    highest: Optional[float] = Field(..., description="Highest ticket price, or null if no eligible concerts")
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "lowest": 45.0,
+                "average": 87.5,
+                "highest": 150.0,
             }
         }
