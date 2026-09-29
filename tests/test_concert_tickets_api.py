@@ -73,3 +73,16 @@ def test_buy_tickets_with_zero_quantity_returns_422(client, db_session):
     response = client.post(f"/api/v1/concerts/{concert.id}/tickets", json={"quantity": 0})
 
     assert response.status_code == 422
+
+
+def test_buy_tickets_with_negative_quantity_returns_422(client, db_session):
+    venue = create_venues(db_session, count=1)[0]
+    tour = _make_tour(db_session, "Negative Quantity Tour")
+    concert = create_concert(
+        db_session, tour, venue, day_offset=0, ticket_price="80.00",
+        base_time=BASE_TIME, tickets_sold=0,
+    )
+
+    response = client.post(f"/api/v1/concerts/{concert.id}/tickets", json={"quantity": -1})
+
+    assert response.status_code == 422
