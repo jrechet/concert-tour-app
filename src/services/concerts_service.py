@@ -16,6 +16,18 @@ from ..schemas.occupancy import OccupancyResponse
 CSV_HEADER = ["date", "city", "venue", "tour"]
 
 
+class ConcertNotFoundError(Exception):
+    """Raised by `sell_tickets` when no concert with the given id exists."""
+
+
+class ConcertCancelledError(Exception):
+    """Raised by `sell_tickets` when the target concert has been cancelled."""
+
+
+class ConcertCapacityExceededError(Exception):
+    """Raised by `sell_tickets` when the sale would exceed the venue's capacity."""
+
+
 def apply_price_filter(query: Query, price_filter: ConcertPriceFilter) -> Query:
     """Apply the validated `min_price`/`max_price` filter to a concerts query.
 
@@ -147,6 +159,41 @@ def get_concert_occupancy(db: Session, concert_id: int) -> Optional[OccupancyRes
         capacity=capacity,
         percentage_sold=percentage_sold,
     )
+
+
+def sell_tickets(concert_id: int, quantity: int, db: Session) -> Concert:
+    """Sell `quantity` tickets for the concert identified by `concert_id`.
+
+    Raises `ConcertNotFoundError` when no such concert exists,
+    `ConcertCancelledError` when the concert has been cancelled, and
+    `ConcertCapacityExceededError` when `tickets_sold + quantity` would
+    exceed the linked venue's capacity (via the real `Concert.venue`
+    relationship, not a hardcoded id). Capacity is treated as unlimited
+    when the venue has none set. On success, increments `tickets_sold`,
+    commits, and returns the updated concert.
+    """
+    concert = (
+        db.query(Concert)
+        .options(joinedload(Concert.venue))
+        .filter(Concert.id == concert_id)
+        .first()
+    )
+    if concert is None:
+        raise ConcertNotFoundError(f"Concert {concert_id} not found")
+    if concert.is_cancelled:
+        raise ConcertCancelledError(f"Concert {concert_id} is cancelled")
+
+    capacity = concert.venue.capacity
+    if capacity is not None and concert.tickets_sold + quantity > capacity:
+        raise ConcertCapacityExceededError(
+            f"Concert {concert_id} cannot sell {quantity} tickets: only "
+            f"{capacity - concert.tickets_sold} remaining of {capacity} capacity"
+        )
+
+    concert.tickets_sold += quantity
+    db.commit()
+    db.refresh(concert)
+    return concert
 
 
 def generate_concerts_csv(db: Session) -> Iterator[str]:
