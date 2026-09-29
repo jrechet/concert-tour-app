@@ -1,7 +1,8 @@
 """SQLAlchemy model for LineupEntry entity."""
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, event, select
-from sqlalchemy.orm import backref, relationship, validates
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, UniqueConstraint, event, select
+from sqlalchemy.orm import relationship, validates
+from sqlalchemy.sql import func
 
 from ..database import Base
 
@@ -16,19 +17,18 @@ class LineupEntry(Base):
     """
 
     __tablename__ = "lineup_entries"
+    __table_args__ = (
+        UniqueConstraint("concert_id", "set_order", name="uq_lineup_entries_concert_id_set_order"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     concert_id = Column(Integer, ForeignKey("concerts.id"), nullable=False, index=True)
     artist_name = Column(String(200), nullable=False)
     set_order = Column(Integer, nullable=False)
     set_time = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
 
-    concert = relationship(
-        "Concert",
-        backref=backref(
-            "lineup", order_by="LineupEntry.set_order", cascade="all, delete-orphan"
-        ),
-    )
+    concert = relationship("Concert", back_populates="lineup")
 
     @validates("set_order")
     def validate_set_order(self, key, value):
@@ -47,6 +47,10 @@ def _reject_duplicate_set_order(connection, target):
     rows if the new entry hasn't been added to a session yet at the point
     `set_order` is assigned, which is the common construction pattern
     (`LineupEntry(concert_id=..., set_order=...)` before `session.add()`).
+
+    This raises a friendlier `ValueError` before the flush even reaches the
+    database; the `UniqueConstraint` in `__table_args__` is the backstop that
+    still enforces the rule for any write path that bypasses this event.
     """
     table = LineupEntry.__table__
     query = select(table.c.id).where(

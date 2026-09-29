@@ -23,6 +23,12 @@ class Concert(Base):
 
     tour = relationship("Tour", backref="concerts")
     venue = relationship("Venue", backref="concerts")
+    lineup = relationship(
+        "LineupEntry",
+        back_populates="concert",
+        cascade="all, delete-orphan",
+        order_by="LineupEntry.set_order",
+    )
 
     @validates("tickets_sold")
     def validate_tickets_sold(self, key, value):
