@@ -9,6 +9,7 @@ from .tour import (
     TourResponse,
     TourSummary,
     TourRevenue,
+    TourCitiesResponse,
     CancelTourRequest,
     CancelTourResponse,
 )
@@ -45,6 +46,7 @@ __all__ = [
     "TourResponse",
     "TourSummary",
     "TourRevenue",
+    "TourCitiesResponse",
     "CancelTourRequest",
     "CancelTourResponse",
     "ConcertCreate",
