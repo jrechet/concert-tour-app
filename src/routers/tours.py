@@ -12,6 +12,7 @@ from ..schemas import (
     CancelTourRequest,
     CancelTourResponse,
     ConcertResponse,
+    TourCitiesResponse,
     TourCreate,
     TourUpdate,
     TourResponse,
@@ -20,7 +21,7 @@ from ..schemas import (
     TourRevenue,
 )
 from ..services.calendar_service import build_tour_calendar
-from ..services.tour_service import get_tour_revenue
+from ..services.tour_service import get_tour_cities, get_tour_revenue
 
 router = APIRouter(prefix="/api/v1/tours", tags=["tours"])
 
@@ -135,6 +136,18 @@ def get_tour_summary(tour_id: int, db: Session = Depends(get_db)):
         last_date=last_date.date() if last_date else None,
         distinct_city_count=distinct_city_count,
     )
+
+
+@router.get("/{tour_id}/cities", response_model=TourCitiesResponse)
+def get_tour_cities_endpoint(tour_id: int, db: Session = Depends(get_db)):
+    """Retrieve the distinct cities a tour passes through, in date order.
+
+    Returns 404 if the tour doesn't exist.
+    """
+    cities = get_tour_cities(db, tour_id)
+    if cities is None:
+        raise HTTPException(status_code=404, detail="Tour not found")
+    return TourCitiesResponse(tour_id=tour_id, cities=cities)
 
 
 @router.get("/{tour_id}/calendar.ics")
