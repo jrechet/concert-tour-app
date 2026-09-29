@@ -2,13 +2,14 @@
 
 from datetime import datetime
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import case, func
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ..database import get_db, get_reference_time
 from ..models import Concert, Tour, Venue
 from ..schemas import ConcertResponse, TourCreate, TourUpdate, TourResponse, TourStatus, TourSummary, TourRevenue
+from ..services.calendar_service import build_tour_calendar
 from ..services.tour_service import get_tour_revenue
 
 router = APIRouter(prefix="/api/v1/tours", tags=["tours"])
@@ -123,6 +124,30 @@ def get_tour_summary(tour_id: int, db: Session = Depends(get_db)):
         first_date=first_date.date() if first_date else None,
         last_date=last_date.date() if last_date else None,
         distinct_city_count=distinct_city_count,
+    )
+
+
+@router.get("/{tour_id}/calendar.ics")
+def get_tour_calendar(tour_id: int, db: Session = Depends(get_db)):
+    """Retrieve a tour's concerts as a downloadable iCalendar (.ics) feed.
+
+    Returns 404 if the tour doesn't exist. A tour with no concerts yields a
+    valid calendar with zero events.
+    """
+    tour = (
+        db.query(Tour)
+        .options(selectinload(Tour.concerts).joinedload(Concert.venue))
+        .filter(Tour.id == tour_id)
+        .first()
+    )
+    if not tour:
+        raise HTTPException(status_code=404, detail="Tour not found")
+
+    ics_bytes = build_tour_calendar(tour)
+    return Response(
+        content=ics_bytes,
+        media_type="text/calendar",
+        headers={"Content-Disposition": f'attachment; filename="tour-{tour_id}.ics"'},
     )
 
 
