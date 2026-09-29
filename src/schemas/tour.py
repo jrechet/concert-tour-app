@@ -5,7 +5,7 @@ Pydantic schemas for Tour entities.
 from datetime import date
 from decimal import Decimal
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field, validator
 
 
@@ -120,6 +120,23 @@ class TourSummary(BaseModel):
                 "first_date": "2024-06-01",
                 "last_date": "2024-12-31",
                 "distinct_city_count": 9
+            }
+        }
+
+
+class TourCitiesResponse(BaseModel):
+    """Schema for the tour cities API response."""
+
+    tour_id: int = Field(..., description="Unique tour identifier")
+    cities: List[str] = Field(..., description="Distinct cities visited, in date order")
+
+    class Config:
+        """Pydantic configuration."""
+        orm_mode = True
+        schema_extra = {
+            "example": {
+                "tour_id": 1,
+                "cities": ["New York", "London", "Paris"]
             }
         }
 
