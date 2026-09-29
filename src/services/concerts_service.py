@@ -107,6 +107,33 @@ def get_next_concert(db: Session, reference_time: Optional[datetime] = None) -> 
     )
 
 
+def get_sold_out_concerts(db: Session, reference_time: Optional[datetime] = None) -> List[Concert]:
+    """Return upcoming, non-cancelled concerts with zero tickets remaining.
+
+    A concert is eligible when its exact `date_time` is at or after
+    `reference_time` (defaulting to `get_reference_time()` when omitted,
+    mirroring `get_next_concert`), it has not been cancelled, and its
+    venue's capacity has been fully sold (`tickets_sold >= capacity`,
+    via the real `Concert.venue` relationship rather than a hardcoded
+    number). Concerts whose venue has no known capacity can't be sold
+    out and are excluded. Ordered soonest first, by date ascending.
+    Eager-loads `Concert.venue` via `joinedload` to avoid N+1 queries.
+    """
+    if reference_time is None:
+        reference_time = get_reference_time()
+    return (
+        db.query(Concert)
+        .join(Venue, Concert.venue_id == Venue.id)
+        .options(joinedload(Concert.venue))
+        .filter(Concert.date_time >= reference_time)
+        .filter(Concert.is_cancelled.is_(False))
+        .filter(Venue.capacity.isnot(None))
+        .filter(Concert.tickets_sold >= Venue.capacity)
+        .order_by(Concert.date_time)
+        .all()
+    )
+
+
 def get_concerts_for_export(db: Session) -> List[dict]:
     """Fetch every concert joined with its venue and tour, ordered by date.
 
