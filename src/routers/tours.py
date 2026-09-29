@@ -21,7 +21,7 @@ from ..schemas import (
     TourRevenue,
 )
 from ..services.calendar_service import build_tour_calendar
-from ..services.tour_service import get_tour_cities, get_tour_revenue
+from ..services.tour_service import get_tour_cities, get_tour_revenue, search_by_artist
 
 router = APIRouter(prefix="/api/v1/tours", tags=["tours"])
 
@@ -56,6 +56,12 @@ def get_tours(
         query = query.filter(Tour.status == status.value)
     tours = query.offset(skip).limit(limit).all()
     return tours
+
+
+@router.get("/search", response_model=List[TourResponse])
+def search_tours_by_artist(artist: str = Query(...), db: Session = Depends(get_db)):
+    """Search tours whose artist contains the given text, case-insensitively."""
+    return search_by_artist(db, artist)
 
 
 @router.get("/{tour_id}", response_model=TourResponse)
