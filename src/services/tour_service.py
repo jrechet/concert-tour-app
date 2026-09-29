@@ -65,3 +65,18 @@ def get_tour_cities(db: Session, tour_id: int) -> Optional[List[str]]:
             seen.add(city)
             distinct_cities.append(city)
     return distinct_cities
+
+
+def search_by_artist(db: Session, artist: str) -> List[Tour]:
+    """Return all tours whose `artist` contains `artist`, case-insensitively.
+
+    Returns an empty list when `artist` is empty or matches nothing.
+    """
+    if not artist:
+        return []
+
+    return (
+        db.query(Tour)
+        .filter(func.lower(Tour.artist).contains(artist.lower()))
+        .all()
+    )

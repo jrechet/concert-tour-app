@@ -3,7 +3,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from src.services.tour_service import get_tour_cities, get_tour_revenue
+from src.services.tour_service import get_tour_cities, get_tour_revenue, search_by_artist
 from tests.fixtures.dashboard_fixtures import create_concert, create_tour, create_venues
 
 BASE_TIME = datetime(2024, 6, 15, 20, 0, 0)
@@ -88,3 +88,53 @@ class TestGetTourCities:
 
     def test_unknown_tour_id_returns_none(self, db_session):
         assert get_tour_cities(db_session, 999999) is None
+
+
+class TestSearchByArtist:
+    """Coverage for `search_by_artist`."""
+
+    def test_exact_match(self, db_session):
+        tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+
+        result = search_by_artist(db_session, "Aurora Belle")
+
+        assert [t.id for t in result] == [tour.id]
+
+    def test_different_case_matches(self, db_session):
+        tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+
+        result = search_by_artist(db_session, "aurora belle")
+
+        assert [t.id for t in result] == [tour.id]
+
+    def test_substring_match(self, db_session):
+        tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+
+        result = search_by_artist(db_session, "rora bel")
+
+        assert [t.id for t in result] == [tour.id]
+
+    def test_no_match_returns_empty_list(self, db_session):
+        create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+
+        assert search_by_artist(db_session, "Nonexistent Artist") == []
+
+    def test_empty_input_returns_empty_list(self, db_session):
+        create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+
+        assert search_by_artist(db_session, "") == []
