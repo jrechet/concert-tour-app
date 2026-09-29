@@ -10,6 +10,8 @@ from src.schemas.stats import (
     VenuesResponse,
     CountryConcertCount,
     CountryConcertCountResponse,
+    MonthlyConcertCount,
+    MonthlyConcertCountResponse,
 )
 
 
@@ -92,4 +94,54 @@ class TestCountryConcertCountResponse:
         with pytest.raises(ValidationError):
             CountryConcertCountResponse(
                 countries=[{"country": "USA", "concert_count": "not-a-number"}]
+            )
+
+
+class TestMonthlyConcertCount:
+    """Test cases for MonthlyConcertCount schema."""
+
+    def test_valid_monthly_concert_count(self):
+        item = MonthlyConcertCount(month="2026-01", count=7)
+        assert item.month == "2026-01"
+        assert item.count == 7
+
+    def test_missing_month_raises(self):
+        with pytest.raises(ValidationError):
+            MonthlyConcertCount(count=7)
+
+    def test_missing_count_raises(self):
+        with pytest.raises(ValidationError):
+            MonthlyConcertCount(month="2026-01")
+
+    def test_invalid_count_type_raises(self):
+        with pytest.raises(ValidationError):
+            MonthlyConcertCount(month="2026-01", count="seven")
+
+
+class TestMonthlyConcertCountResponse:
+    """Test cases for MonthlyConcertCountResponse schema."""
+
+    def test_valid_list_of_monthly_counts(self):
+        response = MonthlyConcertCountResponse(
+            months=[
+                {"month": "2026-01", "count": 7},
+                {"month": "2026-02", "count": 3},
+            ]
+        )
+        assert len(response.months) == 2
+        assert response.months[0].month == "2026-01"
+        assert response.months[0].count == 7
+
+    def test_empty_list_is_valid(self):
+        response = MonthlyConcertCountResponse(months=[])
+        assert response.months == []
+
+    def test_missing_months_raises(self):
+        with pytest.raises(ValidationError):
+            MonthlyConcertCountResponse()
+
+    def test_invalid_item_type_raises(self):
+        with pytest.raises(ValidationError):
+            MonthlyConcertCountResponse(
+                months=[{"month": "2026-01", "count": "not-a-number"}]
             )

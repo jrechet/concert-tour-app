@@ -96,3 +96,38 @@ class CountryConcertCountResponse(BaseModel):
                 ]
             }
         }
+
+
+class MonthlyConcertCount(BaseModel):
+    """Number of concerts hosted during a single calendar month."""
+
+    month: str = Field(..., description="Calendar month in 'YYYY-MM' format")
+    count: int = Field(..., description="Number of concerts in this month")
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "month": "2026-01",
+                "count": 7
+            }
+        }
+
+
+class MonthlyConcertCountResponse(BaseModel):
+    """Schema wrapping the per-month concert counts."""
+
+    months: List[MonthlyConcertCount] = Field(
+        ..., description="Number of concerts per calendar month"
+    )
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "months": [
+                    {"month": "2026-01", "count": 7},
+                    {"month": "2026-02", "count": 3},
+                ]
+            }
+        }
