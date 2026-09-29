@@ -12,7 +12,9 @@ from typing import List, Tuple
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from ..database import get_reference_time
 from ..models import Concert, Venue
+from ..schemas.stats import PriceStatsResponse
 
 
 def get_distinct_cities(db: Session) -> List[str]:
@@ -98,3 +100,38 @@ def get_distinct_venue_names(db: Session) -> List[str]:
         .all()
     )
     return [row[0] for row in rows]
+
+
+def get_price_stats(db: Session) -> PriceStatsResponse:
+    """Compute ticket price statistics over upcoming, non-cancelled concerts
+    with a known price.
+
+    A concert is upcoming when its calendar date is today or later (matching
+    `get_upcoming_concert_count`'s definition, compared against
+    `get_reference_time()`). Cancelled concerts and concerts with no
+    `ticket_price` set are excluded. All three fields are `None` when there
+    are no eligible concerts; this is checked explicitly via the row count
+    rather than assumed from `func.min`/`avg`/`max`'s null-on-empty-set
+    behavior.
+    """
+    reference_time = get_reference_time()
+    row = (
+        db.query(
+            func.count(Concert.id),
+            func.min(Concert.ticket_price),
+            func.avg(Concert.ticket_price),
+            func.max(Concert.ticket_price),
+        )
+        .filter(func.date(Concert.date_time) >= func.date(reference_time))
+        .filter(Concert.is_cancelled.is_(False))
+        .filter(Concert.ticket_price.isnot(None))
+        .one()
+    )
+    count, lowest, average, highest = row
+    if not count:
+        return PriceStatsResponse(lowest=None, average=None, highest=None)
+    return PriceStatsResponse(
+        lowest=float(lowest),
+        average=float(average),
+        highest=float(highest),
+    )

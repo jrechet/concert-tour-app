@@ -12,6 +12,7 @@ from src.schemas.stats import (
     CountryConcertCountResponse,
     MonthlyConcertCount,
     MonthlyConcertCountResponse,
+    PriceStatsResponse,
 )
 
 
@@ -145,3 +146,23 @@ class TestMonthlyConcertCountResponse:
             MonthlyConcertCountResponse(
                 months=[{"month": "2026-01", "count": "not-a-number"}]
             )
+
+
+class TestPriceStatsResponse:
+    """Test cases for PriceStatsResponse schema."""
+
+    def test_valid_price_stats(self):
+        response = PriceStatsResponse(lowest=45.0, average=87.5, highest=150.0)
+        assert response.lowest == 45.0
+        assert response.average == 87.5
+        assert response.highest == 150.0
+
+    def test_all_none_is_valid(self):
+        response = PriceStatsResponse(lowest=None, average=None, highest=None)
+        assert response.lowest is None
+        assert response.average is None
+        assert response.highest is None
+
+    def test_missing_fields_raise(self):
+        with pytest.raises(ValidationError):
+            PriceStatsResponse(lowest=45.0, average=87.5)

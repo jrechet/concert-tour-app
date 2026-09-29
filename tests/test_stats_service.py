@@ -8,6 +8,7 @@ from src.services.stats_service import (
     get_concert_counts_by_month,
     get_distinct_cities,
     get_distinct_venue_names,
+    get_price_stats,
 )
 from tests.fixtures.dashboard_fixtures import create_concert, create_tour, create_venues
 
@@ -203,3 +204,89 @@ def test_get_concert_counts_by_month_omits_months_with_only_cancelled_concerts(d
 
 def test_get_concert_counts_by_month_returns_empty_list_when_no_concerts(db_session):
     assert get_concert_counts_by_month(db_session) == []
+
+
+def test_get_price_stats_returns_none_triple_when_no_concerts(db_session):
+    result = get_price_stats(db_session)
+
+    assert result.lowest is None
+    assert result.average is None
+    assert result.highest is None
+
+
+def test_get_price_stats_computes_min_avg_max_over_upcoming_priced_concerts(db_session):
+    tour = _seed_tour(db_session)
+    venue = create_venues(db_session, count=1)[0]
+    base_time = datetime.now()
+    create_concert(db_session, tour, venue, day_offset=1, ticket_price="50.00", base_time=base_time)
+    create_concert(db_session, tour, venue, day_offset=2, ticket_price="100.00", base_time=base_time)
+    create_concert(db_session, tour, venue, day_offset=3, ticket_price="150.00", base_time=base_time)
+
+    result = get_price_stats(db_session)
+
+    assert result.lowest == 50.0
+    assert result.average == 100.0
+    assert result.highest == 150.0
+
+
+def test_get_price_stats_excludes_cancelled_concerts(db_session):
+    tour = _seed_tour(db_session)
+    venue = create_venues(db_session, count=1)[0]
+    base_time = datetime.now()
+    create_concert(db_session, tour, venue, day_offset=1, ticket_price="50.00", base_time=base_time)
+    create_concert(
+        db_session, tour, venue, day_offset=2, ticket_price="1000.00", base_time=base_time,
+        is_cancelled=True, cancellation_reason="Artist illness",
+    )
+
+    result = get_price_stats(db_session)
+
+    assert result.lowest == 50.0
+    assert result.average == 50.0
+    assert result.highest == 50.0
+
+
+def test_get_price_stats_excludes_past_concerts(db_session):
+    tour = _seed_tour(db_session)
+    venue = create_venues(db_session, count=1)[0]
+    base_time = datetime.now()
+    create_concert(db_session, tour, venue, day_offset=-5, ticket_price="1000.00", base_time=base_time)
+    create_concert(db_session, tour, venue, day_offset=1, ticket_price="50.00", base_time=base_time)
+
+    result = get_price_stats(db_session)
+
+    assert result.lowest == 50.0
+    assert result.average == 50.0
+    assert result.highest == 50.0
+
+
+def test_get_price_stats_excludes_concerts_with_no_price(db_session):
+    tour = _seed_tour(db_session)
+    venue = create_venues(db_session, count=1)[0]
+    base_time = datetime.now()
+    create_concert(db_session, tour, venue, day_offset=1, ticket_price=None, base_time=base_time)
+    create_concert(db_session, tour, venue, day_offset=2, ticket_price="75.00", base_time=base_time)
+
+    result = get_price_stats(db_session)
+
+    assert result.lowest == 75.0
+    assert result.average == 75.0
+    assert result.highest == 75.0
+
+
+def test_get_price_stats_returns_none_triple_when_only_ineligible_concerts(db_session):
+    tour = _seed_tour(db_session)
+    venue = create_venues(db_session, count=1)[0]
+    base_time = datetime.now()
+    create_concert(db_session, tour, venue, day_offset=-1, ticket_price="50.00", base_time=base_time)
+    create_concert(db_session, tour, venue, day_offset=1, ticket_price=None, base_time=base_time)
+    create_concert(
+        db_session, tour, venue, day_offset=2, ticket_price="60.00", base_time=base_time,
+        is_cancelled=True, cancellation_reason="Venue unavailable",
+    )
+
+    result = get_price_stats(db_session)
+
+    assert result.lowest is None
+    assert result.average is None
+    assert result.highest is None
