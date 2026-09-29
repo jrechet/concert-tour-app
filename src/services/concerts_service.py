@@ -28,6 +28,11 @@ class ConcertCapacityExceededError(Exception):
     """Raised by `sell_tickets` when the sale would exceed the venue's capacity."""
 
 
+class InsufficientSoldTicketsError(Exception):
+    """Raised by `refund_tickets` when the requested quantity exceeds the
+    concert's current `tickets_sold` count."""
+
+
 def apply_price_filter(query: Query, price_filter: ConcertPriceFilter) -> Query:
     """Apply the validated `min_price`/`max_price` filter to a concerts query.
 
@@ -218,6 +223,32 @@ def sell_tickets(concert_id: int, quantity: int, db: Session) -> Concert:
         )
 
     concert.tickets_sold += quantity
+    db.commit()
+    db.refresh(concert)
+    return concert
+
+
+def refund_tickets(concert_id: int, quantity: int, db: Session) -> Concert:
+    """Refund `quantity` previously sold tickets for the concert identified
+    by `concert_id`.
+
+    Raises `ConcertNotFoundError` when no such concert exists, and
+    `InsufficientSoldTicketsError` when `quantity` exceeds the concert's
+    current `tickets_sold` count, so a refund can never drive it negative.
+    On success, decrements `tickets_sold`, commits, and returns the updated
+    concert.
+    """
+    concert = db.query(Concert).filter(Concert.id == concert_id).first()
+    if concert is None:
+        raise ConcertNotFoundError(f"Concert {concert_id} not found")
+
+    if quantity > concert.tickets_sold:
+        raise InsufficientSoldTicketsError(
+            f"Concert {concert_id} cannot refund {quantity} tickets: only "
+            f"{concert.tickets_sold} currently sold"
+        )
+
+    concert.tickets_sold -= quantity
     db.commit()
     db.refresh(concert)
     return concert
