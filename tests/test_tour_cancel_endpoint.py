@@ -90,6 +90,28 @@ class TestCancelTourEndpoint:
         response = client.post(f"/api/v1/tours/{tour.id}/cancel", json={"reason": "   "})
         assert response.status_code == 422
 
+    def test_cancels_concert_on_same_calendar_day_as_reference_time(self, client, db_session):
+        """A concert dated the same calendar day as `reference_time` counts as
+        upcoming, confirming the `>=` boundary in the date comparison."""
+        base_time = REFERENCE_TIME
+        venues = create_venues(db_session, count=1)
+        tour = create_tour(
+            db_session, "Boundary Tour", "Test Artist",
+            (base_time - timedelta(days=10)).date(), (base_time + timedelta(days=10)).date(), "active",
+        )
+        same_day = create_concert(db_session, tour, venues[0], day_offset=0, ticket_price="80.00", base_time=base_time)
+
+        response = client.post(
+            f"/api/v1/tours/{tour.id}/cancel",
+            json={"reason": "Artist illness"},
+        )
+        assert response.status_code == 200
+        assert response.json() == {"cancelled_count": 1}
+
+        db_session.refresh(same_day)
+        assert same_day.is_cancelled is True
+        assert same_day.cancellation_reason == "Artist illness"
+
     def test_cancel_tour_with_no_upcoming_concerts_returns_zero(self, client, db_session):
         base_time = REFERENCE_TIME
         venues = create_venues(db_session, count=1)
