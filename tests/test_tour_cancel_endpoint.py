@@ -90,6 +90,14 @@ class TestCancelTourEndpoint:
         response = client.post(f"/api/v1/tours/{tour.id}/cancel", json={"reason": "   "})
         assert response.status_code == 422
 
+    def test_cancel_tour_empty_string_reason_returns_422(self, client, db_session):
+        tour = create_tour(
+            db_session, "Empty Reason Tour", "Test Artist",
+            datetime(2024, 6, 1).date(), datetime(2024, 7, 1).date(), "active",
+        )
+        response = client.post(f"/api/v1/tours/{tour.id}/cancel", json={"reason": ""})
+        assert response.status_code == 422
+
     def test_cancels_concert_on_same_calendar_day_as_reference_time(self, client, db_session):
         """A concert dated the same calendar day as `reference_time` counts as
         upcoming, confirming the `>=` boundary in the date comparison."""
