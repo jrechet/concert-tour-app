@@ -14,6 +14,7 @@ from ..schemas import (
     CountResponse,
     CountryConcertCount,
     MonthlyConcertCount,
+    PriceStatsResponse,
     UpcomingCountResponse,
     VenuesResponse,
 )
@@ -23,6 +24,7 @@ from ..services.stats_service import (
     get_concert_counts_by_month,
     get_distinct_cities,
     get_distinct_venue_names,
+    get_price_stats,
     get_upcoming_concert_count,
 )
 
@@ -95,3 +97,13 @@ def get_upcoming_count(
     excluded from the count.
     """
     return {"count": get_upcoming_concert_count(db, reference_time)}
+
+
+@router.get("/prices", response_model=PriceStatsResponse)
+def get_prices_stats(db: Session = Depends(get_db)):
+    """Retrieve ticket price statistics (lowest, average, highest) over
+    upcoming, non-cancelled concerts with a known price.
+
+    All three fields are `null` when there are no eligible concerts.
+    """
+    return get_price_stats(db)
