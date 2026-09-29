@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 from sqlalchemy import case, func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from ..config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
@@ -21,6 +22,8 @@ from ..schemas import (
     ConcertNextResponse,
     ConcertPriceFilter,
     ConcertResponse,
+    LineupEntryCreate,
+    LineupEntryOut,
     LineupEntryResponse,
     NextConcertCity,
     NextConcertVenue,
@@ -369,6 +372,65 @@ def get_concert_lineup(
         .all()
     )
     return entries
+
+
+@api_router.post(
+    "/{concert_id}/lineup",
+    response_model=LineupEntryOut,
+    status_code=201,
+    responses={
+        404: {
+            "description": "No concert exists with the given `concert_id`.",
+            "content": {"application/json": {"example": {"detail": "Concert not found"}}},
+        },
+        409: {
+            "description": "A lineup entry already exists for this concert with the given `set_order`.",
+            "content": {
+                "application/json": {"example": {"detail": "set_order 1 is already taken for this concert"}}
+            },
+        },
+    },
+)
+def create_concert_lineup_entry(
+    concert_id: int, payload: LineupEntryCreate, db: Session = Depends(get_db)
+):
+    """Add a supporting act to a concert's lineup.
+
+    Returns 404 when the concert doesn't exist and 409 when `set_order` is
+    already taken for it. The 409 is both pre-checked (for the common case)
+    and enforced as a fallback against the DB's unique constraint, so a
+    concurrent insert for the same slot can never surface as a 500.
+    """
+    concert_exists = db.query(Concert.id).filter(Concert.id == concert_id).first()
+    if not concert_exists:
+        raise HTTPException(status_code=404, detail="Concert not found")
+
+    conflict_detail = f"set_order {payload.set_order} is already taken for this concert"
+
+    existing = (
+        db.query(LineupEntry.id)
+        .filter(
+            LineupEntry.concert_id == concert_id,
+            LineupEntry.set_order == payload.set_order,
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=409, detail=conflict_detail)
+
+    entry = LineupEntry(
+        concert_id=concert_id,
+        artist_name=payload.artist_name,
+        set_order=payload.set_order,
+    )
+    db.add(entry)
+    try:
+        db.commit()
+    except (IntegrityError, ValueError):
+        db.rollback()
+        raise HTTPException(status_code=409, detail=conflict_detail)
+    db.refresh(entry)
+    return entry
 
 
 @api_router.get(

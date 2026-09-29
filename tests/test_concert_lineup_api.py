@@ -1,5 +1,6 @@
-"""Tests for GET /api/v1/concerts/{concert_id}/lineup: ordering, pagination,
-the 404-for-missing-concert case, and the empty-lineup case.
+"""Tests for GET and POST /api/v1/concerts/{concert_id}/lineup: ordering,
+pagination, creation, the 404-for-missing-concert case, and the
+409-for-duplicate-set_order case.
 
 Uses real venue/tour/concert fixtures persisted via the ORM so every foreign
 key (concert_id) is a genuine committed id, not a hardcoded literal.
@@ -148,3 +149,93 @@ def test_lineup_endpoint_isolates_entries_by_concert(client, db_session):
     data = response.json()
     assert len(data) == 1
     assert data[0]["artist_name"] == "Opener A"
+
+
+def test_create_lineup_entry_returns_201_and_created_entry(client, db_session):
+    concert = _build_concert(db_session)
+
+    response = client.post(
+        f"/api/v1/concerts/{concert.id}/lineup",
+        json={"artist_name": "The Openers", "set_order": 1},
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["artist_name"] == "The Openers"
+    assert data["set_order"] == 1
+    assert data["concert_id"] == concert.id
+    assert "id" in data
+    assert "created_at" in data
+
+
+def test_create_lineup_entry_persists_to_db(client, db_session):
+    concert = _build_concert(db_session)
+
+    client.post(
+        f"/api/v1/concerts/{concert.id}/lineup",
+        json={"artist_name": "The Openers", "set_order": 1},
+    )
+
+    entries = db_session.query(LineupEntry).filter(LineupEntry.concert_id == concert.id).all()
+    assert len(entries) == 1
+    assert entries[0].artist_name == "The Openers"
+
+
+def test_create_lineup_entry_returns_404_for_nonexistent_concert(client, db_session):
+    nonexistent_id = 999999
+
+    response = client.post(
+        f"/api/v1/concerts/{nonexistent_id}/lineup",
+        json={"artist_name": "The Openers", "set_order": 1},
+    )
+
+    assert response.status_code == 404
+
+
+def test_create_lineup_entry_returns_409_when_set_order_taken(client, db_session):
+    concert = _build_concert(db_session)
+    _add_lineup(db_session, concert, [("First Opener", 1)])
+
+    response = client.post(
+        f"/api/v1/concerts/{concert.id}/lineup",
+        json={"artist_name": "Second Opener", "set_order": 1},
+    )
+
+    assert response.status_code == 409
+    entries = db_session.query(LineupEntry).filter(LineupEntry.concert_id == concert.id).all()
+    assert len(entries) == 1
+
+
+def test_create_lineup_entry_allows_same_set_order_on_different_concerts(client, db_session):
+    concert_a = _build_concert(db_session)
+    concert_b = _build_concert(db_session)
+    _add_lineup(db_session, concert_a, [("Opener A", 1)])
+
+    response = client.post(
+        f"/api/v1/concerts/{concert_b.id}/lineup",
+        json={"artist_name": "Opener B", "set_order": 1},
+    )
+
+    assert response.status_code == 201
+
+
+def test_create_lineup_entry_rejects_blank_artist_name(client, db_session):
+    concert = _build_concert(db_session)
+
+    response = client.post(
+        f"/api/v1/concerts/{concert.id}/lineup",
+        json={"artist_name": "   ", "set_order": 1},
+    )
+
+    assert response.status_code == 422
+
+
+def test_create_lineup_entry_rejects_non_positive_set_order(client, db_session):
+    concert = _build_concert(db_session)
+
+    response = client.post(
+        f"/api/v1/concerts/{concert.id}/lineup",
+        json={"artist_name": "The Openers", "set_order": 0},
+    )
+
+    assert response.status_code == 422
