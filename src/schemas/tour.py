@@ -124,6 +124,43 @@ class TourSummary(BaseModel):
         }
 
 
+class CancelTourRequest(BaseModel):
+    """Schema for requesting cancellation of a tour."""
+
+    reason: str = Field(..., min_length=1, description="Reason for cancelling the tour")
+
+    @validator('reason')
+    def validate_reason_not_blank(cls, v):
+        """Reject a reason that is only whitespace, and trim surrounding
+        whitespace from valid ones."""
+        trimmed = v.strip()
+        if not trimmed:
+            raise ValueError('reason must not be blank')
+        return trimmed
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "reason": "Artist illness"
+            }
+        }
+
+
+class CancelTourResponse(BaseModel):
+    """Schema for the tour cancellation API response."""
+
+    cancelled_count: int = Field(..., description="Number of concerts cancelled")
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "cancelled_count": 5
+            }
+        }
+
+
 class TourRevenue(BaseModel):
     """Schema for the tour revenue API response."""
 
