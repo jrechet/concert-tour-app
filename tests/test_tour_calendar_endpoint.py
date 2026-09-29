@@ -50,6 +50,17 @@ class TestTourCalendarEndpoint:
         vevents = [component for component in parsed.walk() if component.name == "VEVENT"]
         assert len(vevents) == 3
 
+        events_by_venue = {str(event["location"]).split(",")[0]: event for event in vevents}
+        for venue in venues:
+            event = events_by_venue[venue.name]
+            assert str(event["summary"]) == f"{tour.name} - {venue.city}"
+            assert str(event["location"]) == f"{venue.name}, {venue.city}, {venue.country}"
+
+    def test_malformed_tour_id_returns_422(self, client):
+        response = client.get("/api/v1/tours/not-an-id/calendar.ics")
+
+        assert response.status_code == 422
+
     def test_calendar_for_tour_with_no_concerts(self, client, empty_tour):
         tour = empty_tour["tour"]
 
