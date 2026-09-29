@@ -38,6 +38,7 @@ from ..services.concerts_service import (
     generate_concerts_csv,
     get_concert_occupancy,
     get_next_concert,
+    get_sold_out_concerts,
     sell_tickets,
 )
 from ..services.concerts_service import get_upcoming_concerts as fetch_upcoming_concerts
@@ -272,6 +273,20 @@ def export_concerts_csv(db: Session = Depends(get_db)):
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=concerts.csv"},
     )
+
+
+@api_router.get("/sold-out", response_model=List[ConcertResponse])
+def get_sold_out_concerts_endpoint(
+    db: Session = Depends(get_db),
+    reference_time: datetime = Depends(get_reference_time),
+):
+    """Retrieve upcoming, non-cancelled concerts that have sold out, soonest first.
+
+    Registered ahead of `/{concert_id}` so the literal `sold-out` path
+    segment isn't swallowed as a concert ID. Returns an empty list (not a
+    404) when no concert is currently sold out.
+    """
+    return get_sold_out_concerts(db, reference_time)
 
 
 @api_router.get("/{concert_id}", response_model=ConcertResponse)
