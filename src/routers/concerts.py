@@ -28,17 +28,20 @@ from ..schemas import (
     NextConcertCity,
     NextConcertVenue,
     OccupancyResponse,
+    RefundRequest,
     TicketPurchaseRequest,
 )
 from ..services.concerts_service import (
     ConcertCancelledError,
     ConcertCapacityExceededError,
     ConcertNotFoundError,
+    InsufficientSoldTicketsError,
     apply_price_filter,
     generate_concerts_csv,
     get_concert_occupancy,
     get_next_concert,
     get_sold_out_concerts,
+    refund_tickets,
     sell_tickets,
 )
 from ..services.concerts_service import get_upcoming_concerts as fetch_upcoming_concerts
@@ -358,6 +361,22 @@ def buy_tickets(concert_id: int, payload: TicketPurchaseRequest, db: Session = D
     except ConcertCancelledError:
         raise HTTPException(status_code=409, detail="Concert is cancelled")
     except ConcertCapacityExceededError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+
+@api_router.post("/{concert_id}/refunds", response_model=ConcertResponse)
+def refund_tickets_endpoint(concert_id: int, payload: RefundRequest, db: Session = Depends(get_db)):
+    """Refund `quantity` previously sold tickets for a concert.
+
+    Returns 404 for an unknown concert, and 409 if the refund quantity
+    exceeds the concert's currently sold tickets. Quantities below 1 are
+    rejected with a 422 by `RefundRequest` itself.
+    """
+    try:
+        return refund_tickets(concert_id, payload.quantity, db)
+    except ConcertNotFoundError:
+        raise HTTPException(status_code=404, detail="Concert not found")
+    except InsufficientSoldTicketsError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
 
 
