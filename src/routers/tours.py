@@ -183,7 +183,9 @@ def cancel_tour(
     """Cancel every upcoming, not-yet-cancelled concert on a tour.
 
     Returns 404 if the tour doesn't exist. Past concerts and concerts
-    already marked cancelled are left untouched. Returns the count of
+    already marked cancelled are left untouched. A concert scheduled on
+    the same calendar day as `reference_time` is treated as upcoming
+    (the same-day boundary is inclusive). Returns the count of
     concerts newly cancelled by this call.
     """
     tour_exists = db.query(Tour.id).filter(Tour.id == tour_id).first()
