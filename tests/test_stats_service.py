@@ -3,7 +3,12 @@
 from datetime import datetime, timedelta
 
 from src.models import Venue
-from src.services.stats_service import get_concert_counts_by_country, get_distinct_cities, get_distinct_venue_names
+from src.services.stats_service import (
+    get_concert_counts_by_country,
+    get_concert_counts_by_month,
+    get_distinct_cities,
+    get_distinct_venue_names,
+)
 from tests.fixtures.dashboard_fixtures import create_concert, create_tour, create_venues
 
 
@@ -149,3 +154,52 @@ def test_get_concert_counts_by_country_counts_mixed_cancelled_and_active_concert
 
 def test_get_concert_counts_by_country_returns_empty_list_when_no_concerts(db_session):
     assert get_concert_counts_by_country(db_session) == []
+
+
+def test_get_concert_counts_by_month_groups_and_orders_chronologically(db_session):
+    tour = _seed_tour(db_session)
+    venue = create_venues(db_session, count=1)[0]
+    base_time = datetime(2026, 1, 15)
+    # March, then January, then February, seeded out of order.
+    create_concert(db_session, tour, venue, day_offset=50, ticket_price="50.00", base_time=base_time)
+    create_concert(db_session, tour, venue, day_offset=0, ticket_price="50.00", base_time=base_time)
+    create_concert(db_session, tour, venue, day_offset=1, ticket_price="50.00", base_time=base_time)
+    create_concert(db_session, tour, venue, day_offset=20, ticket_price="50.00", base_time=base_time)
+
+    result = get_concert_counts_by_month(db_session)
+
+    assert result == [("2026-01", 2), ("2026-02", 1), ("2026-03", 1)]
+
+
+def test_get_concert_counts_by_month_excludes_cancelled_concerts(db_session):
+    tour = _seed_tour(db_session)
+    venue = create_venues(db_session, count=1)[0]
+    base_time = datetime(2026, 1, 15)
+    create_concert(db_session, tour, venue, day_offset=0, ticket_price="50.00", base_time=base_time)
+    create_concert(
+        db_session, tour, venue, day_offset=1, ticket_price="50.00", base_time=base_time,
+        is_cancelled=True, cancellation_reason="Artist illness",
+    )
+
+    result = get_concert_counts_by_month(db_session)
+
+    assert result == [("2026-01", 1)]
+
+
+def test_get_concert_counts_by_month_omits_months_with_only_cancelled_concerts(db_session):
+    tour = _seed_tour(db_session)
+    venue = create_venues(db_session, count=1)[0]
+    base_time = datetime(2026, 1, 15)
+    create_concert(
+        db_session, tour, venue, day_offset=0, ticket_price="50.00", base_time=base_time,
+        is_cancelled=True, cancellation_reason="Venue unavailable",
+    )
+    create_concert(db_session, tour, venue, day_offset=20, ticket_price="50.00", base_time=base_time)
+
+    result = get_concert_counts_by_month(db_session)
+
+    assert result == [("2026-02", 1)]
+
+
+def test_get_concert_counts_by_month_returns_empty_list_when_no_concerts(db_session):
+    assert get_concert_counts_by_month(db_session) == []

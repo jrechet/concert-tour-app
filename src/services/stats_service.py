@@ -67,6 +67,25 @@ def get_upcoming_concert_count(db: Session, reference_time: datetime) -> int:
     )
 
 
+def get_concert_counts_by_month(db: Session) -> List[Tuple[str, int]]:
+    """Return `(month, concert_count)` tuples for non-cancelled concerts,
+    grouped by calendar month (`YYYY-MM`) and ordered chronologically
+    ascending.
+
+    A month with no non-cancelled concerts is absent from the result,
+    rather than appearing with a count of 0.
+    """
+    month = func.strftime("%Y-%m", Concert.date_time)
+    rows = (
+        db.query(month.label("month"), func.count(Concert.id).label("concert_count"))
+        .filter(Concert.is_cancelled.is_(False))
+        .group_by(month)
+        .order_by(month)
+        .all()
+    )
+    return [(row[0], row[1]) for row in rows]
+
+
 def get_distinct_venue_names(db: Session) -> List[str]:
     """Return the distinct, alphabetically sorted names of venues hosting
     at least one concert."""
