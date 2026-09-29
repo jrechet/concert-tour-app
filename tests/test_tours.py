@@ -339,3 +339,65 @@ def test_get_tour_summary_not_found():
     """Requesting a summary for a nonexistent tour returns 404."""
     response = client.get("/api/v1/tours/999/summary")
     assert response.status_code == 404
+
+
+def test_search_tours_by_artist():
+    """Searching by artist returns matching tours, case-insensitively."""
+    client.post("/api/v1/tours/", json={
+        "name": "World Tour 2024",
+        "artist": "Aurora Belle",
+        "start_date": "2024-01-01",
+        "end_date": "2024-12-31",
+        "status": "planned",
+    })
+    client.post("/api/v1/tours/", json={
+        "name": "Other Tour",
+        "artist": "Someone Else",
+        "start_date": "2024-01-01",
+        "end_date": "2024-12-31",
+        "status": "planned",
+    })
+
+    response = client.get("/api/v1/tours/search?artist=aurora")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["artist"] == "Aurora Belle"
+
+
+def test_search_tours_by_artist_no_matches():
+    """Searching by an artist with no matches returns an empty list."""
+    client.post("/api/v1/tours/", json={
+        "name": "World Tour 2024",
+        "artist": "Aurora Belle",
+        "start_date": "2024-01-01",
+        "end_date": "2024-12-31",
+        "status": "planned",
+    })
+
+    response = client.get("/api/v1/tours/search?artist=Nonexistent")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_search_tours_missing_artist_returns_422():
+    """Omitting the required `artist` query param returns a 422 validation error."""
+    response = client.get("/api/v1/tours/search")
+    assert response.status_code == 422
+
+
+def test_search_route_does_not_shadow_tour_id_route():
+    """The static /search route must not swallow numeric /tours/{id} lookups."""
+    tour_data = {
+        "name": "Test Tour",
+        "artist": "Test Artist",
+        "start_date": "2024-01-01",
+        "end_date": "2024-12-31",
+        "status": "planned",
+    }
+    create_response = client.post("/api/v1/tours/", json=tour_data)
+    tour_id = create_response.json()["id"]
+
+    response = client.get(f"/api/v1/tours/{tour_id}")
+    assert response.status_code == 200
+    assert response.json()["id"] == tour_id
