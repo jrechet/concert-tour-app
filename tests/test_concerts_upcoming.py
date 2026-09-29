@@ -96,6 +96,66 @@ class TestUpcomingConcerts:
         assert response.status_code == 200
         assert response.json() == []
 
+    def test_show_past_false_excludes_past_concert(self, client, db_session):
+        venues = create_venues(db_session, count=1)
+        tour = create_tour(
+            db_session, "Farewell Tour", "Test Artist",
+            (REFERENCE_TIME - timedelta(days=60)).date(),
+            (REFERENCE_TIME + timedelta(days=1)).date(),
+            "active",
+        )
+        create_concert(db_session, tour, venues[0], day_offset=-1, ticket_price="80.00", base_time=REFERENCE_TIME)
+
+        response = client.get("/api/v1/concerts/upcoming?show_past=false")
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_show_past_true_includes_past_concert(self, client, db_session):
+        venues = create_venues(db_session, count=1)
+        tour = create_tour(
+            db_session, "Farewell Tour", "Test Artist",
+            (REFERENCE_TIME - timedelta(days=60)).date(),
+            (REFERENCE_TIME + timedelta(days=1)).date(),
+            "active",
+        )
+        past_concert = create_concert(
+            db_session, tour, venues[0], day_offset=-1, ticket_price="80.00", base_time=REFERENCE_TIME
+        )
+
+        response = client.get("/api/v1/concerts/upcoming?show_past=true")
+        assert response.status_code == 200
+        returned_ids = [item["id"] for item in response.json()]
+
+        assert returned_ids == [past_concert.id]
+
+    def test_missing_show_past_defaults_to_hiding_past_concerts(self, client, db_session):
+        venues = create_venues(db_session, count=1)
+        tour = create_tour(
+            db_session, "Farewell Tour", "Test Artist",
+            (REFERENCE_TIME - timedelta(days=60)).date(),
+            (REFERENCE_TIME + timedelta(days=1)).date(),
+            "active",
+        )
+        create_concert(db_session, tour, venues[0], day_offset=-1, ticket_price="80.00", base_time=REFERENCE_TIME)
+
+        response = client.get("/api/v1/concerts/upcoming")
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_invalid_show_past_value_falls_back_to_hiding_past_concerts(self, client, db_session):
+        venues = create_venues(db_session, count=1)
+        tour = create_tour(
+            db_session, "Farewell Tour", "Test Artist",
+            (REFERENCE_TIME - timedelta(days=60)).date(),
+            (REFERENCE_TIME + timedelta(days=1)).date(),
+            "active",
+        )
+        create_concert(db_session, tour, venues[0], day_offset=-1, ticket_price="80.00", base_time=REFERENCE_TIME)
+
+        response = client.get("/api/v1/concerts/upcoming?show_past=not-a-boolean")
+        assert response.status_code == 200
+        assert response.json() == []
+
     def test_response_payload_matches_expected_schema(self, client, db_session):
         venues = create_venues(db_session, count=1)
         tour = create_tour(

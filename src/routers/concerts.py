@@ -36,6 +36,22 @@ TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
+TRUTHY_VALUES = {"true", "1", "yes", "on"}
+
+
+def coerce_show_past(show_past: Optional[str] = Query(None, description="When 'true', past concerts are included alongside upcoming ones")) -> bool:
+    """Coerce the raw `show_past` query string to a boolean, safely.
+
+    Accepted as a raw string (rather than FastAPI's native `bool` query
+    type) so any value other than a recognized truthy token — missing,
+    blank, malformed, or unexpected — falls back to `False` rather than
+    raising a 422/500, per the "hide past concerts by default" contract.
+    """
+    if show_past is None:
+        return False
+    return show_past.strip().lower() in TRUTHY_VALUES
+
+
 def get_price_filter(
     min_price: Optional[float] = Query(None, ge=0, description="Only include concerts priced at or above this amount"),
     max_price: Optional[float] = Query(None, ge=0, description="Only include concerts priced at or below this amount"),
@@ -183,16 +199,20 @@ def get_concert_cities(db: Session = Depends(get_db)):
 
 @api_router.get("/upcoming", response_model=List[ConcertResponse])
 def get_upcoming_concerts(
+    show_past: bool = Depends(coerce_show_past),
     db: Session = Depends(get_db),
     reference_time: datetime = Depends(get_reference_time),
 ):
-    """Retrieve concerts scheduled today or later, ordered soonest first.
+    """Retrieve concerts ordered soonest first.
 
-    A concert is upcoming when its calendar date (compared against
-    `reference_time`) is today or in the future; past concerts are
-    excluded entirely rather than appended, unlike `GET /`.
+    By default (no `show_past` param, or any value other than a recognized
+    truthy token), a concert is upcoming when its calendar date (compared
+    against `reference_time`) is today or in the future; past concerts are
+    excluded entirely rather than appended, unlike `GET /`. When
+    `show_past=true`, past concerts are included too, still ordered
+    chronologically.
     """
-    return fetch_upcoming_concerts(db, reference_time)
+    return fetch_upcoming_concerts(db, reference_time, show_past=show_past)
 
 
 @api_router.get(
