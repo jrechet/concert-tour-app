@@ -25,8 +25,18 @@ from ..schemas import (
     NextConcertCity,
     NextConcertVenue,
     OccupancyResponse,
+    TicketPurchaseRequest,
 )
-from ..services.concerts_service import apply_price_filter, generate_concerts_csv, get_concert_occupancy, get_next_concert
+from ..services.concerts_service import (
+    ConcertCancelledError,
+    ConcertCapacityExceededError,
+    ConcertNotFoundError,
+    apply_price_filter,
+    generate_concerts_csv,
+    get_concert_occupancy,
+    get_next_concert,
+    sell_tickets,
+)
 from ..services.concerts_service import get_upcoming_concerts as fetch_upcoming_concerts
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
@@ -313,6 +323,24 @@ def uncancel_concert(concert_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(concert)
     return concert
+
+
+@api_router.post("/{concert_id}/tickets", response_model=ConcertResponse)
+def buy_tickets(concert_id: int, payload: TicketPurchaseRequest, db: Session = Depends(get_db)):
+    """Purchase `quantity` tickets for a concert.
+
+    Returns 404 for an unknown concert, and 409 if the concert has been
+    cancelled or the purchase would exceed the venue's capacity. Quantities
+    below 1 are rejected with a 422 by `TicketPurchaseRequest` itself.
+    """
+    try:
+        return sell_tickets(concert_id, payload.quantity, db)
+    except ConcertNotFoundError:
+        raise HTTPException(status_code=404, detail="Concert not found")
+    except ConcertCancelledError:
+        raise HTTPException(status_code=409, detail="Concert is cancelled")
+    except ConcertCapacityExceededError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
 
 
 @api_router.get("/{concert_id}/lineup", response_model=List[LineupEntryResponse])
