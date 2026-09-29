@@ -214,6 +214,50 @@ def test_get_months_stats_excludes_cancelled_concerts(client, db_session):
     assert response.json() == [{"month": "2026-01", "count": 1}]
 
 
+def test_get_months_stats_omits_months_with_only_cancelled_concerts(client, db_session):
+    tour = _seed_tour(db_session)
+    venue = create_venues(db_session, count=1)[0]
+    base_time = datetime(2026, 1, 15)
+    # February has only cancelled concerts and must not appear in the response at all.
+    create_concert(
+        db_session, tour, venue, day_offset=20, ticket_price="50.00", base_time=base_time,
+        is_cancelled=True, cancellation_reason="Venue unavailable",
+    )
+    create_concert(
+        db_session, tour, venue, day_offset=25, ticket_price="50.00", base_time=base_time,
+        is_cancelled=True, cancellation_reason="Weather",
+    )
+    create_concert(db_session, tour, venue, day_offset=0, ticket_price="50.00", base_time=base_time)
+
+    response = client.get("/api/v1/stats/months")
+
+    assert response.status_code == 200
+    months = [entry["month"] for entry in response.json()]
+    assert "2026-02" not in months
+    assert response.json() == [{"month": "2026-01", "count": 1}]
+
+
+def test_get_months_stats_orders_multiple_months_chronologically(client, db_session):
+    tour = _seed_tour(db_session)
+    venue = create_venues(db_session, count=1)[0]
+    base_time = datetime(2026, 1, 15)
+    # Concerts are inserted out of chronological order to verify the response
+    # is sorted, not merely reflecting insertion order.
+    create_concert(db_session, tour, venue, day_offset=80, ticket_price="50.00", base_time=base_time)  # 2026-04
+    create_concert(db_session, tour, venue, day_offset=0, ticket_price="50.00", base_time=base_time)  # 2026-01
+    create_concert(db_session, tour, venue, day_offset=45, ticket_price="50.00", base_time=base_time)  # 2026-03
+    create_concert(db_session, tour, venue, day_offset=1, ticket_price="50.00", base_time=base_time)  # 2026-01
+
+    response = client.get("/api/v1/stats/months")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {"month": "2026-01", "count": 2},
+        {"month": "2026-03", "count": 1},
+        {"month": "2026-04", "count": 1},
+    ]
+
+
 def test_get_upcoming_count_response_shape(client, db_session):
     tour = _seed_tour(db_session)
     venue = create_venues(db_session, count=1)[0]
