@@ -34,6 +34,24 @@ class TestTourCitiesEndpoint:
         # the cancelled concert's venue does not add a second Paris entry.
         assert data["cities"] == ["New York", "London", "Paris"]
 
+    def test_cancelled_only_concert_excludes_its_city_entirely(self, client, db_session):
+        venues = create_venues(db_session, count=2)
+        tour = create_tour(
+            db_session, "Solstice Echoes Tour", "Vela Ashford",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        create_concert(db_session, tour, venues[0], day_offset=0, ticket_price="80.00", base_time=BASE_TIME)
+        create_concert(
+            db_session, tour, venues[1], day_offset=1, ticket_price="120.00", base_time=BASE_TIME,
+            is_cancelled=True, cancellation_reason="Venue unavailable",
+        )
+
+        response = client.get(f"/api/v1/tours/{tour.id}/cities")
+        assert response.status_code == 200
+        data = response.json()
+        # London's only concert was cancelled, so it never appears at all.
+        assert data["cities"] == ["New York"]
+
     def test_cities_for_tour_with_no_concerts(self, client, empty_tour):
         tour = empty_tour["tour"]
 
