@@ -333,7 +333,8 @@ a {
   font-size: var(--font-size-sm);
 }
 
-.concert-hide-cancelled-label {
+.concert-hide-cancelled-label,
+.concert-show-past-label {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-xs);
