@@ -37,23 +37,42 @@ def apply_price_filter(query: Query, price_filter: ConcertPriceFilter) -> Query:
     return query
 
 
-def get_upcoming_concerts(db: Session, reference_time: Optional[datetime] = None) -> List[Concert]:
-    """Return concerts scheduled today or later, ordered soonest first.
+def is_past(concert: Concert, reference_time: Optional[datetime] = None) -> bool:
+    """Whether `concert`'s calendar date is strictly before `reference_time`'s.
 
-    A concert is upcoming when its calendar date is today or in the
-    future, compared against `reference_time` (defaulting to
-    `get_reference_time()`, i.e. the app's current date, when omitted).
-    Past concerts are excluded entirely.
+    Compares calendar dates only (not exact timestamps), so a concert later
+    today is not past. `reference_time` defaults to `get_reference_time()`
+    when omitted. Operates on an already-loaded `Concert`, so it's directly
+    testable with a plain object/mock rather than a DB-backed one, and is
+    the single source of truth for "is this concert past" so that rule
+    isn't reimplemented ad hoc at each call site.
     """
     if reference_time is None:
         reference_time = get_reference_time()
-    return (
-        db.query(Concert)
-        .options(joinedload(Concert.venue))
-        .filter(func.date(Concert.date_time) >= func.date(reference_time))
-        .order_by(Concert.date_time)
-        .all()
-    )
+    return concert.date_time.date() < reference_time.date()
+
+
+def get_upcoming_concerts(
+    db: Session,
+    reference_time: Optional[datetime] = None,
+    show_past: bool = False,
+) -> List[Concert]:
+    """Return concerts ordered soonest first, by date ascending.
+
+    When `show_past` is False (default), only concerts scheduled today or
+    later are returned, compared against `reference_time` (defaulting to
+    `get_reference_time()`, i.e. the app's current date, when omitted);
+    past concerts are excluded entirely. When `show_past` is True, every
+    concert is returned instead, past and future alike, still ordered
+    chronologically. The date boundary mirrors `is_past`'s semantics
+    (calendar date, not exact timestamp).
+    """
+    if reference_time is None:
+        reference_time = get_reference_time()
+    query = db.query(Concert).options(joinedload(Concert.venue))
+    if not show_past:
+        query = query.filter(func.date(Concert.date_time) >= func.date(reference_time))
+    return query.order_by(Concert.date_time).all()
 
 
 def get_next_concert(db: Session, reference_time: Optional[datetime] = None) -> Optional[Concert]:
