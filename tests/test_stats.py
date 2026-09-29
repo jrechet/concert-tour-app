@@ -174,6 +174,46 @@ def test_get_upcoming_count_includes_concert_scheduled_exactly_today(client, db_
     assert response.json() == {"count": 1}
 
 
+def test_get_months_stats_returns_empty_list_when_no_concerts(client, db_session):
+    response = client.get("/api/v1/stats/months")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_get_months_stats_groups_and_orders_chronologically(client, db_session):
+    tour = _seed_tour(db_session)
+    venue = create_venues(db_session, count=1)[0]
+    base_time = datetime(2026, 1, 15)
+    create_concert(db_session, tour, venue, day_offset=50, ticket_price="50.00", base_time=base_time)
+    create_concert(db_session, tour, venue, day_offset=0, ticket_price="50.00", base_time=base_time)
+    create_concert(db_session, tour, venue, day_offset=1, ticket_price="50.00", base_time=base_time)
+
+    response = client.get("/api/v1/stats/months")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {"month": "2026-01", "count": 2},
+        {"month": "2026-03", "count": 1},
+    ]
+
+
+def test_get_months_stats_excludes_cancelled_concerts(client, db_session):
+    tour = _seed_tour(db_session)
+    venue = create_venues(db_session, count=1)[0]
+    base_time = datetime(2026, 1, 15)
+    create_concert(db_session, tour, venue, day_offset=0, ticket_price="50.00", base_time=base_time)
+    create_concert(
+        db_session, tour, venue, day_offset=1, ticket_price="50.00", base_time=base_time,
+        is_cancelled=True, cancellation_reason="Artist illness",
+    )
+
+    response = client.get("/api/v1/stats/months")
+
+    assert response.status_code == 200
+    assert response.json() == [{"month": "2026-01", "count": 1}]
+
+
 def test_get_upcoming_count_response_shape(client, db_session):
     tour = _seed_tour(db_session)
     venue = create_venues(db_session, count=1)[0]

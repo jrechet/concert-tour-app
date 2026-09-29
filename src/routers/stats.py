@@ -13,12 +13,14 @@ from ..schemas import (
     CitiesResponse,
     CountResponse,
     CountryConcertCount,
+    MonthlyConcertCount,
     UpcomingCountResponse,
     VenuesResponse,
 )
 from ..services.stats_service import (
     get_concert_count,
     get_concert_counts_by_country,
+    get_concert_counts_by_month,
     get_distinct_cities,
     get_distinct_venue_names,
     get_upcoming_concert_count,
@@ -63,6 +65,21 @@ def get_countries_stats(db: Session = Depends(get_db)):
     return [
         CountryConcertCount(country=country, concert_count=count)
         for country, count in get_concert_counts_by_country(db)
+    ]
+
+
+@router.get("/months", response_model=List[MonthlyConcertCount])
+def get_months_stats(db: Session = Depends(get_db)):
+    """Retrieve the number of non-cancelled concerts per calendar month,
+    ordered chronologically ascending.
+
+    Cancelled concerts are excluded from the counts. A month with zero
+    non-cancelled concerts is omitted from the response rather than
+    appearing with a count of 0.
+    """
+    return [
+        MonthlyConcertCount(month=month, count=count)
+        for month, count in get_concert_counts_by_month(db)
     ]
 
 
