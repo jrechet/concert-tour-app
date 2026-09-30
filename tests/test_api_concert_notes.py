@@ -1,8 +1,10 @@
-"""Tests for the `PUT /api/v1/concerts/{id}/notes` endpoint.
+"""Coverage for concert `notes`: `GET /api/v1/concerts/{id}` returning it
+(null by default, the stored string once set) and `PUT
+/api/v1/concerts/{id}/notes` updating it.
 
 Uses real venue/tour/concert fixtures persisted via the ORM so every
 foreign key is a genuine committed id, not a hardcoded literal like
-venue_id=1.
+venue_id=1, matching the convention used by `tests/api/test_concerts.py`.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -30,6 +32,33 @@ def _seed_concert(db_session, notes=None):
         db_session.commit()
         db_session.refresh(concert)
     return concert
+
+
+def test_get_concert_notes_null_by_default(client, db_session):
+    concert = _seed_concert(db_session)
+
+    response = client.get(f"/api/v1/concerts/{concert.id}")
+
+    assert response.status_code == 200
+    assert response.json()["notes"] is None
+
+
+def test_get_concert_notes_after_put_reflects_value(client, db_session):
+    concert = _seed_concert(db_session)
+
+    concert.notes = "VIP meet-and-greet before doors open"
+    db_session.commit()
+
+    response = client.get(f"/api/v1/concerts/{concert.id}")
+
+    assert response.status_code == 200
+    assert response.json()["notes"] == "VIP meet-and-greet before doors open"
+
+
+def test_get_concert_unknown_still_404(client, db_session):
+    response = client.get("/api/v1/concerts/999999")
+
+    assert response.status_code == 404
 
 
 def test_put_notes_success_200(client, db_session):
