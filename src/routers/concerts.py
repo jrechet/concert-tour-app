@@ -20,6 +20,7 @@ from ..models import Concert, LineupEntry, Tour, Venue
 from ..schemas import (
     CancelConcertRequest,
     ConcertNextResponse,
+    ConcertNotesUpdate,
     ConcertPriceFilter,
     ConcertRescheduleRequest,
     ConcertResponse,
@@ -348,6 +349,35 @@ def reschedule_concert_endpoint(
         raise HTTPException(status_code=409, detail=str(exc))
     except InvalidDateError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+
+
+@api_router.put(
+    "/{concert_id}/notes",
+    response_model=ConcertResponse,
+    responses={
+        404: {
+            "description": "No concert exists with the given `concert_id`.",
+            "content": {"application/json": {"example": {"detail": "Concert not found"}}},
+        },
+        422: {
+            "description": "`notes` exceeds the 500-character limit.",
+        },
+    },
+)
+def update_concert_notes(concert_id: int, payload: ConcertNotesUpdate, db: Session = Depends(get_db)):
+    """Update the free-text `notes` for a concert.
+
+    Returns 404 for an unknown concert. `notes` above 500 characters is
+    rejected with a 422 by `ConcertNotesUpdate` itself.
+    """
+    concert = db.query(Concert).filter(Concert.id == concert_id).first()
+    if not concert:
+        raise HTTPException(status_code=404, detail="Concert not found")
+
+    concert.notes = payload.notes
+    db.commit()
+    db.refresh(concert)
+    return concert
 
 
 @api_router.post("/{concert_id}/cancel", response_model=ConcertResponse)
