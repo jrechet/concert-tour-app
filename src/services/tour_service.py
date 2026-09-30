@@ -1,5 +1,6 @@
 """Query logic backing tour-level aggregates, such as ticket revenue."""
 
+from datetime import date
 from decimal import Decimal
 from typing import List, NamedTuple, Optional
 
@@ -14,6 +15,18 @@ class TourRevenue(NamedTuple):
 
     revenue: Decimal
     concert_count: int
+
+
+class TourNotFoundError(Exception):
+    """Raised by `get_tour_span` when no tour with the given id exists."""
+
+
+class TourSpan(NamedTuple):
+    """A tour's date span, derived from its non-cancelled concerts."""
+
+    first_date: Optional[date]
+    last_date: Optional[date]
+    days_between: Optional[int]
 
 
 def get_tour_revenue(db: Session, tour_id: int) -> Optional[TourRevenue]:
@@ -65,6 +78,35 @@ def get_tour_cities(db: Session, tour_id: int) -> Optional[List[str]]:
             seen.add(city)
             distinct_cities.append(city)
     return distinct_cities
+
+
+def get_tour_span(tour_id: int, db: Session) -> TourSpan:
+    """Compute a tour's date span from its non-cancelled concerts.
+
+    `days_between` is the integer number of calendar days between
+    `first_date` and `last_date` (0 when there's only one concert). Returns
+    a `TourSpan` of all `None` when the tour has zero non-cancelled
+    concerts. Raises `TourNotFoundError` when no tour with `tour_id`
+    exists, so the router can translate that into a 404.
+    """
+    if db.query(Tour.id).filter(Tour.id == tour_id).first() is None:
+        raise TourNotFoundError(f"Tour {tour_id} not found")
+
+    first_date_time, last_date_time = (
+        db.query(func.min(Concert.date_time), func.max(Concert.date_time))
+        .filter(Concert.tour_id == tour_id, Concert.is_cancelled.is_(False))
+        .first()
+    )
+    if first_date_time is None:
+        return TourSpan(first_date=None, last_date=None, days_between=None)
+
+    first_date = first_date_time.date()
+    last_date = last_date_time.date()
+    return TourSpan(
+        first_date=first_date,
+        last_date=last_date,
+        days_between=(last_date - first_date).days,
+    )
 
 
 def search_by_artist(db: Session, artist: str) -> List[Tour]:

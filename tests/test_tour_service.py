@@ -1,9 +1,17 @@
 """Unit tests for `get_tour_revenue`, independent of the HTTP layer."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 
-from src.services.tour_service import get_tour_cities, get_tour_revenue, search_by_artist
+import pytest
+
+from src.services.tour_service import (
+    TourNotFoundError,
+    get_tour_cities,
+    get_tour_revenue,
+    get_tour_span,
+    search_by_artist,
+)
 from tests.fixtures.dashboard_fixtures import create_concert, create_tour, create_venues
 
 BASE_TIME = datetime(2024, 6, 15, 20, 0, 0)
@@ -88,6 +96,72 @@ class TestGetTourCities:
 
     def test_unknown_tour_id_returns_none(self, db_session):
         assert get_tour_cities(db_session, 999999) is None
+
+
+class TestGetTourSpan:
+    """Coverage for `get_tour_span`."""
+
+    def test_excludes_cancelled_concerts_from_span(self, db_session):
+        venues = create_venues(db_session, count=3)
+        tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        create_concert(db_session, tour, venues[0], day_offset=1, ticket_price="80.00", base_time=BASE_TIME)
+        create_concert(db_session, tour, venues[1], day_offset=3, ticket_price="80.00", base_time=BASE_TIME)
+        # Latest concert by date is cancelled, so it shouldn't set last_date.
+        create_concert(
+            db_session, tour, venues[2], day_offset=10, ticket_price="80.00", base_time=BASE_TIME,
+            is_cancelled=True, cancellation_reason="Artist illness",
+        )
+
+        result = get_tour_span(tour.id, db_session)
+
+        assert result.first_date == (BASE_TIME + timedelta(days=1)).date()
+        assert result.last_date == (BASE_TIME + timedelta(days=3)).date()
+        assert result.days_between == 2
+
+    def test_single_concert_has_zero_days_between(self, db_session):
+        venues = create_venues(db_session, count=1)
+        tour = create_tour(
+            db_session, "Solo Night Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        create_concert(db_session, tour, venues[0], day_offset=0, ticket_price="80.00", base_time=BASE_TIME)
+
+        result = get_tour_span(tour.id, db_session)
+
+        assert result.first_date == result.last_date == BASE_TIME.date()
+        assert result.days_between == 0
+
+    def test_tour_with_zero_non_cancelled_concerts_returns_all_none(self, db_session):
+        venues = create_venues(db_session, count=1)
+        tour = create_tour(
+            db_session, "Cancelled Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "cancelled",
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=0, ticket_price="80.00", base_time=BASE_TIME,
+            is_cancelled=True, cancellation_reason="Artist illness",
+        )
+
+        result = get_tour_span(tour.id, db_session)
+
+        assert result == (None, None, None)
+
+    def test_tour_with_no_concerts_returns_all_none(self, db_session):
+        tour = create_tour(
+            db_session, "Unannounced Tour", "TBD Collective",
+            BASE_TIME.date(), BASE_TIME.date(), "planned",
+        )
+
+        result = get_tour_span(tour.id, db_session)
+
+        assert result == (None, None, None)
+
+    def test_unknown_tour_id_raises_tour_not_found_error(self, db_session):
+        with pytest.raises(TourNotFoundError):
+            get_tour_span(999999, db_session)
 
 
 class TestSearchByArtist:
