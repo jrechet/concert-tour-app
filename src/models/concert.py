@@ -20,6 +20,7 @@ class Concert(Base):
     tickets_sold = Column(Integer, nullable=False, default=0)
     is_cancelled = Column(Boolean, nullable=False, default=False, server_default="0")
     cancellation_reason = Column(String(500), nullable=True)
+    notes = Column(String(500), nullable=True, default=None)
 
     tour = relationship("Tour", backref="concerts")
     venue = relationship("Venue", backref="concerts")
