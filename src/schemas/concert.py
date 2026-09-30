@@ -106,6 +106,22 @@ class ConcertRescheduleRequest(BaseModel):
         }
 
 
+class ConcertNotesUpdate(BaseModel):
+    """Schema for the request body of the update-concert-notes endpoint."""
+
+    notes: str = Field(
+        ..., max_length=500, description="Free-text notes about this concert"
+    )
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "notes": "VIP meet-and-greet before doors open",
+            }
+        }
+
+
 class ConcertPriceFilter(BaseModel):
     """Query-parameter validation for the `min_price`/`max_price` filters on
     the concerts list endpoint.
