@@ -16,12 +16,19 @@ from ..schemas import (
     TourCreate,
     TourUpdate,
     TourResponse,
+    TourSpanResponse,
     TourStatus,
     TourSummary,
     TourRevenue,
 )
 from ..services.calendar_service import build_tour_calendar
-from ..services.tour_service import get_tour_cities, get_tour_revenue, search_by_artist
+from ..services.tour_service import (
+    TourNotFoundError,
+    get_tour_cities,
+    get_tour_revenue,
+    get_tour_span,
+    search_by_artist,
+)
 
 router = APIRouter(prefix="/api/v1/tours", tags=["tours"])
 
@@ -141,6 +148,24 @@ def get_tour_summary(tour_id: int, db: Session = Depends(get_db)):
         first_date=first_date.date() if first_date else None,
         last_date=last_date.date() if last_date else None,
         distinct_city_count=distinct_city_count,
+    )
+
+
+@router.get("/{tour_id}/span", response_model=TourSpanResponse)
+def get_tour_span_endpoint(tour_id: int, db: Session = Depends(get_db)):
+    """Retrieve a tour's date span, derived from its non-cancelled concerts.
+
+    Returns 404 if the tour doesn't exist. A tour with zero non-cancelled
+    concerts yields a response with all-null fields.
+    """
+    try:
+        span = get_tour_span(tour_id, db)
+    except TourNotFoundError:
+        raise HTTPException(status_code=404, detail="Tour not found")
+    return TourSpanResponse(
+        first_date=span.first_date,
+        last_date=span.last_date,
+        days_between=span.days_between,
     )
 
 
