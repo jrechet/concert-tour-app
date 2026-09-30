@@ -21,6 +21,7 @@ from ..schemas import (
     CancelConcertRequest,
     ConcertNextResponse,
     ConcertPriceFilter,
+    ConcertRescheduleRequest,
     ConcertResponse,
     LineupEntryCreate,
     LineupEntryOut,
@@ -36,12 +37,14 @@ from ..services.concerts_service import (
     ConcertCapacityExceededError,
     ConcertNotFoundError,
     InsufficientSoldTicketsError,
+    InvalidDateError,
     apply_price_filter,
     generate_concerts_csv,
     get_concert_occupancy,
     get_next_concert,
     get_sold_out_concerts,
     refund_tickets,
+    reschedule_concert,
     sell_tickets,
 )
 from ..services.concerts_service import get_upcoming_concerts as fetch_upcoming_concerts
@@ -305,6 +308,46 @@ def get_concert(concert_id: int, db: Session = Depends(get_db)):
     if not concert:
         raise HTTPException(status_code=404, detail="Concert not found")
     return concert
+
+
+@api_router.patch(
+    "/{concert_id}",
+    response_model=ConcertResponse,
+    responses={
+        404: {
+            "description": "No concert exists with the given `concert_id`.",
+            "content": {"application/json": {"example": {"detail": "Concert not found"}}},
+        },
+        409: {
+            "description": "The concert has been cancelled and cannot be rescheduled.",
+            "content": {"application/json": {"example": {"detail": "Concert 1 is cancelled"}}},
+        },
+        422: {
+            "description": "The requested `date_time` is not in the future.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "new_date_time 2024-01-01 00:00:00 must be in the future"}
+                }
+            },
+        },
+    },
+)
+def reschedule_concert_endpoint(
+    concert_id: int, payload: ConcertRescheduleRequest, db: Session = Depends(get_db)
+):
+    """Reschedule a concert to a new `date_time`.
+
+    Returns 404 for an unknown concert, 409 if the concert has been
+    cancelled, and 422 if the new `date_time` is not in the future.
+    """
+    try:
+        return reschedule_concert(db, concert_id, payload.date_time)
+    except ConcertNotFoundError:
+        raise HTTPException(status_code=404, detail="Concert not found")
+    except ConcertCancelledError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except InvalidDateError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @api_router.post("/{concert_id}/cancel", response_model=ConcertResponse)
