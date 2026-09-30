@@ -6,6 +6,7 @@ concert are included (a venue with no concerts is excluded, rather than
 listing every venue in the table).
 """
 
+from collections import OrderedDict
 from datetime import datetime
 from typing import List, Tuple
 
@@ -15,6 +16,10 @@ from sqlalchemy.orm import Session
 from ..database import get_reference_time
 from ..models import Concert, Venue
 from ..schemas.stats import PriceStatsResponse
+
+_WEEKDAY_NAMES = [
+    "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+]
 
 
 def get_distinct_cities(db: Session) -> List[str]:
@@ -100,6 +105,27 @@ def get_distinct_venue_names(db: Session) -> List[str]:
         .all()
     )
     return [row[0] for row in rows]
+
+
+def get_concerts_per_weekday(db: Session) -> "OrderedDict[str, int]":
+    """Return an ordered mapping of weekday name to non-cancelled concert
+    count, keyed Monday through Sunday.
+
+    Every weekday is present even when no concert falls on it (counted as
+    0), unlike the other `get_concert_counts_by_*` helpers in this module
+    which omit empty buckets. The grouping is done in Python (rather than
+    a SQL `GROUP BY`) since `date_time.isoweekday()` behaves the same
+    regardless of the underlying database dialect.
+    """
+    counts = OrderedDict((name, 0) for name in _WEEKDAY_NAMES)
+    rows = (
+        db.query(Concert.date_time)
+        .filter(Concert.is_cancelled.is_(False))
+        .all()
+    )
+    for (date_time,) in rows:
+        counts[_WEEKDAY_NAMES[date_time.isoweekday() - 1]] += 1
+    return counts
 
 
 def get_price_stats(db: Session) -> PriceStatsResponse:
