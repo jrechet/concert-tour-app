@@ -178,6 +178,25 @@ class CancelTourResponse(BaseModel):
         }
 
 
+class TourSpanResponse(BaseModel):
+    """Schema for the tour span API response."""
+
+    first_date: Optional[date] = Field(None, description="Earliest non-cancelled concert date")
+    last_date: Optional[date] = Field(None, description="Latest non-cancelled concert date")
+    days_between: Optional[int] = Field(None, description="Number of calendar days between first_date and last_date")
+
+    class Config:
+        """Pydantic configuration."""
+        orm_mode = True
+        schema_extra = {
+            "example": {
+                "first_date": "2024-06-01",
+                "last_date": "2024-12-31",
+                "days_between": 213
+            }
+        }
+
+
 class TourRevenue(BaseModel):
     """Schema for the tour revenue API response."""
 
