@@ -17,11 +17,13 @@ from ..schemas import (
     PriceStatsResponse,
     UpcomingCountResponse,
     VenuesResponse,
+    WeekdayStatsResponse,
 )
 from ..services.stats_service import (
     get_concert_count,
     get_concert_counts_by_country,
     get_concert_counts_by_month,
+    get_concerts_per_weekday,
     get_distinct_cities,
     get_distinct_venue_names,
     get_price_stats,
@@ -107,3 +109,24 @@ def get_prices_stats(db: Session = Depends(get_db)):
     All three fields are `null` when there are no eligible concerts.
     """
     return get_price_stats(db)
+
+
+@router.get("/weekdays", response_model=WeekdayStatsResponse)
+def get_weekdays_stats(db: Session = Depends(get_db)):
+    """Retrieve the number of non-cancelled concerts held on each day of the
+    week, keyed Monday through Sunday.
+
+    Cancelled concerts are excluded from the counts. Every weekday is
+    present in the response even when no concert falls on it, appearing
+    with a count of 0 rather than being omitted.
+    """
+    counts = get_concerts_per_weekday(db)
+    return WeekdayStatsResponse(
+        monday=counts["Monday"],
+        tuesday=counts["Tuesday"],
+        wednesday=counts["Wednesday"],
+        thursday=counts["Thursday"],
+        friday=counts["Friday"],
+        saturday=counts["Saturday"],
+        sunday=counts["Sunday"],
+    )
