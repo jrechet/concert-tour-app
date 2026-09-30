@@ -45,6 +45,7 @@ from ..services.concerts_service import (
     sell_tickets,
 )
 from ..services.concerts_service import get_upcoming_concerts as fetch_upcoming_concerts
+from ..services.lineup_service import LineupEntryNotFoundError, delete_lineup_entry
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
 api_router = APIRouter(prefix="/api/v1/concerts", tags=["concerts"])
@@ -465,6 +466,31 @@ def create_concert_lineup_entry(
         raise HTTPException(status_code=409, detail=conflict_detail)
     db.refresh(entry)
     return entry
+
+
+@api_router.delete(
+    "/{concert_id}/lineup/{entry_id}",
+    status_code=204,
+    responses={
+        404: {
+            "description": "No concert exists with the given `concert_id`, no lineup entry exists with the given `entry_id`, or the entry belongs to a different concert.",
+            "content": {"application/json": {"example": {"detail": "Concert not found"}}},
+        },
+    },
+)
+def delete_concert_lineup_entry(concert_id: int, entry_id: int, db: Session = Depends(get_db)):
+    """Remove a supporting act from a concert's lineup.
+
+    Returns 404 when the concert doesn't exist, when the entry doesn't
+    exist, or when the entry belongs to a different concert.
+    """
+    try:
+        delete_lineup_entry(db, concert_id=concert_id, entry_id=entry_id)
+    except ConcertNotFoundError:
+        raise HTTPException(status_code=404, detail="Concert not found")
+    except LineupEntryNotFoundError:
+        raise HTTPException(status_code=404, detail="Lineup entry not found")
+    return Response(status_code=204)
 
 
 @api_router.get(
