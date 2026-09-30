@@ -197,6 +197,25 @@ class TourSpanResponse(BaseModel):
         }
 
 
+class TourOccupancyResponse(BaseModel):
+    """Schema for the tour occupancy API response."""
+
+    tickets_sold: int = Field(..., description="Tickets sold across the tour's non-cancelled concerts")
+    total_capacity: int = Field(..., description="Total venue capacity across the tour's non-cancelled concerts")
+    percentage_sold: float = Field(..., description="Tickets sold as a percentage of total capacity, rounded to 2 decimal places")
+
+    class Config:
+        """Pydantic configuration."""
+        orm_mode = True
+        schema_extra = {
+            "example": {
+                "tickets_sold": 24000,
+                "total_capacity": 30000,
+                "percentage_sold": 80.0,
+            }
+        }
+
+
 class TourRevenue(BaseModel):
     """Schema for the tour revenue API response."""
 

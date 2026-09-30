@@ -15,6 +15,7 @@ from ..schemas import (
     TourCitiesResponse,
     TourCreate,
     TourUpdate,
+    TourOccupancyResponse,
     TourResponse,
     TourSpanResponse,
     TourStatus,
@@ -22,6 +23,7 @@ from ..schemas import (
     TourRevenue,
 )
 from ..services.calendar_service import build_tour_calendar
+from ..services.occupancy import TourNotFoundError as OccupancyTourNotFoundError, get_tour_occupancy
 from ..services.tour_service import (
     TourNotFoundError,
     get_tour_cities,
@@ -215,6 +217,23 @@ def get_tour_revenue_endpoint(tour_id: int, db: Session = Depends(get_db)):
     if result is None:
         raise HTTPException(status_code=404, detail="Tour not found")
     return result
+
+
+@router.get("/{tour_id}/occupancy", response_model=TourOccupancyResponse)
+def get_tour_occupancy_endpoint(tour_id: int, db: Session = Depends(get_db)):
+    """Retrieve ticket occupancy for a tour, aggregated over its non-cancelled concerts.
+
+    Returns 404 if the tour doesn't exist.
+    """
+    try:
+        result = get_tour_occupancy(db, tour_id)
+    except OccupancyTourNotFoundError:
+        raise HTTPException(status_code=404, detail="Tour not found")
+    return TourOccupancyResponse(
+        tickets_sold=result.tickets_sold,
+        total_capacity=result.total_capacity,
+        percentage_sold=result.percentage_sold,
+    )
 
 
 @router.post("/{tour_id}/cancel", response_model=CancelTourResponse)
