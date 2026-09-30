@@ -239,3 +239,53 @@ def test_create_lineup_entry_rejects_non_positive_set_order(client, db_session):
     )
 
     assert response.status_code == 422
+
+
+def test_delete_lineup_entry_returns_204_and_empty_body(client, db_session):
+    concert = _build_concert(db_session)
+    _add_lineup(db_session, concert, [("Opening Act", 1)])
+    entry_id = db_session.query(LineupEntry).filter(LineupEntry.concert_id == concert.id).one().id
+
+    response = client.delete(f"/api/v1/concerts/{concert.id}/lineup/{entry_id}")
+
+    assert response.status_code == 204
+    assert response.content == b""
+
+
+def test_delete_lineup_entry_persists_removal(client, db_session):
+    concert = _build_concert(db_session)
+    _add_lineup(db_session, concert, [("Opening Act", 1)])
+    entry_id = db_session.query(LineupEntry).filter(LineupEntry.concert_id == concert.id).one().id
+
+    client.delete(f"/api/v1/concerts/{concert.id}/lineup/{entry_id}")
+
+    assert db_session.query(LineupEntry).filter(LineupEntry.id == entry_id).first() is None
+
+
+def test_delete_lineup_entry_returns_404_for_nonexistent_concert(client, db_session):
+    nonexistent_concert_id = 999999
+
+    response = client.delete(f"/api/v1/concerts/{nonexistent_concert_id}/lineup/1")
+
+    assert response.status_code == 404
+
+
+def test_delete_lineup_entry_returns_404_for_nonexistent_entry(client, db_session):
+    concert = _build_concert(db_session)
+    nonexistent_entry_id = 999999
+
+    response = client.delete(f"/api/v1/concerts/{concert.id}/lineup/{nonexistent_entry_id}")
+
+    assert response.status_code == 404
+
+
+def test_delete_lineup_entry_returns_404_when_entry_belongs_to_different_concert(client, db_session):
+    concert_a = _build_concert(db_session)
+    concert_b = _build_concert(db_session)
+    _add_lineup(db_session, concert_b, [("Opener B", 1)])
+    entry_id = db_session.query(LineupEntry).filter(LineupEntry.concert_id == concert_b.id).one().id
+
+    response = client.delete(f"/api/v1/concerts/{concert_a.id}/lineup/{entry_id}")
+
+    assert response.status_code == 404
+    assert db_session.query(LineupEntry).filter(LineupEntry.id == entry_id).first() is not None
