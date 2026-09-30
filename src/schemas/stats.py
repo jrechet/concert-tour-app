@@ -154,3 +154,29 @@ class PriceStatsResponse(BaseModel):
                 "highest": 150.0,
             }
         }
+
+
+class WeekdayStatsResponse(BaseModel):
+    """Schema wrapping the number of concerts held on each day of the week."""
+
+    monday: int = Field(..., ge=0, description="Number of concerts held on Mondays")
+    tuesday: int = Field(..., ge=0, description="Number of concerts held on Tuesdays")
+    wednesday: int = Field(..., ge=0, description="Number of concerts held on Wednesdays")
+    thursday: int = Field(..., ge=0, description="Number of concerts held on Thursdays")
+    friday: int = Field(..., ge=0, description="Number of concerts held on Fridays")
+    saturday: int = Field(..., ge=0, description="Number of concerts held on Saturdays")
+    sunday: int = Field(..., ge=0, description="Number of concerts held on Sundays")
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "monday": 3,
+                "tuesday": 1,
+                "wednesday": 2,
+                "thursday": 4,
+                "friday": 6,
+                "saturday": 8,
+                "sunday": 5,
+            }
+        }
