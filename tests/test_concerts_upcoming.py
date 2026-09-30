@@ -196,4 +196,5 @@ class TestUpcomingConcerts:
             "is_almost_sold_out",
             "is_cancelled",
             "cancellation_reason",
+            "notes",
         }

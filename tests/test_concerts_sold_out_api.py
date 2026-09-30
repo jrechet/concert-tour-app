@@ -136,7 +136,7 @@ class TestSoldOutConcerts:
             "id", "tour_id", "venue_id", "venue_name", "venue_city", "date_time",
             "days_until_concert", "ticket_price", "tickets_sold", "remaining_tickets",
             "sold_out", "is_sold_out", "is_almost_sold_out", "is_cancelled",
-            "cancellation_reason",
+            "cancellation_reason", "notes",
         }
 
     def test_sold_out_route_not_swallowed_by_concert_id_route(self, client):

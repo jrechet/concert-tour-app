@@ -214,6 +214,9 @@ class ConcertResponse(BaseModel):
     cancellation_reason: Optional[str] = Field(
         None, description="Free-text reason for cancellation; null when the concert is not cancelled"
     )
+    notes: Optional[str] = Field(
+        None, max_length=500, description="Free-text notes about this concert; null when none have been added"
+    )
 
     class Config:
         """Pydantic configuration."""
@@ -234,6 +237,7 @@ class ConcertResponse(BaseModel):
                 "is_sold_out": False,
                 "is_almost_sold_out": True,
                 "is_cancelled": False,
-                "cancellation_reason": None
+                "cancellation_reason": None,
+                "notes": None
             }
         }
