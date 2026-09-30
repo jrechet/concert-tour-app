@@ -2,7 +2,7 @@
 
 import csv
 import io
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Iterator, List, Optional
 
 from sqlalchemy import func
@@ -31,6 +31,11 @@ class ConcertCapacityExceededError(Exception):
 class InsufficientSoldTicketsError(Exception):
     """Raised by `refund_tickets` when the requested quantity exceeds the
     concert's current `tickets_sold` count."""
+
+
+class InvalidDateError(Exception):
+    """Raised by `reschedule_concert` when the requested `new_date_time`
+    is not in the future."""
 
 
 def apply_price_filter(query: Query, price_filter: ConcertPriceFilter) -> Query:
@@ -249,6 +254,35 @@ def refund_tickets(concert_id: int, quantity: int, db: Session) -> Concert:
         )
 
     concert.tickets_sold -= quantity
+    db.commit()
+    db.refresh(concert)
+    return concert
+
+
+def reschedule_concert(db: Session, concert_id: int, new_date_time: datetime) -> Concert:
+    """Move the concert identified by `concert_id` to `new_date_time`.
+
+    Raises `ConcertNotFoundError` when no such concert exists,
+    `ConcertCancelledError` when the concert has been cancelled, and
+    `InvalidDateError` when `new_date_time` is not in the future. The
+    future check compares in UTC, treating a naive `new_date_time` as
+    already being UTC (mirroring `calendar_service.DEFAULT_TIMEZONE`),
+    so naive and timezone-aware inputs are handled consistently. On
+    success, updates `date_time`, commits, and returns the updated concert.
+    """
+    concert = db.query(Concert).filter(Concert.id == concert_id).first()
+    if concert is None:
+        raise ConcertNotFoundError(f"Concert {concert_id} not found")
+    if concert.is_cancelled:
+        raise ConcertCancelledError(f"Concert {concert_id} is cancelled")
+
+    aware_new_date_time = (
+        new_date_time if new_date_time.tzinfo is not None else new_date_time.replace(tzinfo=timezone.utc)
+    )
+    if aware_new_date_time < datetime.now(timezone.utc):
+        raise InvalidDateError(f"new_date_time {new_date_time} must be in the future")
+
+    concert.date_time = new_date_time
     db.commit()
     db.refresh(concert)
     return concert

@@ -92,6 +92,20 @@ class CancelConcertRequest(BaseModel):
         }
 
 
+class ConcertRescheduleRequest(BaseModel):
+    """Schema for the request body of the reschedule-concert endpoint."""
+
+    date_time: datetime = Field(..., description="New concert date and time")
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "date_time": "2024-08-01T20:00:00",
+            }
+        }
+
+
 class ConcertPriceFilter(BaseModel):
     """Query-parameter validation for the `min_price`/`max_price` filters on
     the concerts list endpoint.
