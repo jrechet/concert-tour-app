@@ -1,0 +1,24 @@
+# CI minimale de la forge forge.jrec.fr (Forgejo Actions). Le depot n a pas de CI GitHub ;
+# ce workflow existe pour que la forge n execute jamais .github/workflows/ (des que ce
+# dossier existe, Forgejo l ignore) et pour verifier que le runner du serveur voit le depot.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  smoke:
+    runs-on: [self-hosted, jre-server]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "concert-tour-app sur la forge, commit $(git rev-parse --short HEAD)"
