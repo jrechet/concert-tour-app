@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from .database import engine, get_db
 from .models import Base, Concert
-from .routers import concerts, stats, tours
+from .routers import concerts, stats, tours, venues
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -36,6 +36,7 @@ app.include_router(tours.router)
 app.include_router(concerts.router)
 app.include_router(concerts.api_router)
 app.include_router(stats.router)
+app.include_router(venues.router)
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
