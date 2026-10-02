@@ -1,7 +1,7 @@
 """Concert-facing endpoints: the JSON list/detail API and the HTMX
 dashboard concert-card fragments."""
 
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -42,6 +42,7 @@ from ..services.concerts_service import (
     apply_price_filter,
     generate_concerts_csv,
     get_concert_occupancy,
+    get_concerts_between_dates,
     get_next_concert,
     get_sold_out_concerts,
     refund_tickets,
@@ -295,6 +296,34 @@ def get_sold_out_concerts_endpoint(
     404) when no concert is currently sold out.
     """
     return get_sold_out_concerts(db, reference_time)
+
+
+@api_router.get(
+    "/between",
+    response_model=List[ConcertResponse],
+    responses={
+        422: {
+            "description": "`start` is after `end`, or either is missing/malformed.",
+            "content": {"application/json": {"example": {"detail": "start must not be after end"}}},
+        },
+    },
+)
+def get_concerts_between(
+    start: date = Query(..., description="Start of the date range (YYYY-MM-DD), inclusive"),
+    end: date = Query(..., description="End of the date range (YYYY-MM-DD), inclusive"),
+    db: Session = Depends(get_db),
+):
+    """Retrieve concerts whose date falls within `start`/`end`, inclusive, soonest first.
+
+    Registered ahead of `/{concert_id}` so the literal `between` path segment
+    isn't swallowed as a concert ID. `start` and `end` are required `date`
+    query parameters, so a missing or malformed value is rejected with a 422
+    by FastAPI itself; a `start` after `end` is rejected with an explicit 422
+    here.
+    """
+    if start > end:
+        raise HTTPException(status_code=422, detail="start must not be after end")
+    return get_concerts_between_dates(db, start, end)
 
 
 @api_router.get("/{concert_id}", response_model=ConcertResponse)
