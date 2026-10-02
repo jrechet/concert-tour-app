@@ -2,7 +2,7 @@
 
 import csv
 import io
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Iterator, List, Optional
 
 from sqlalchemy import func
@@ -95,6 +95,24 @@ def get_upcoming_concerts(
     if not show_past:
         query = query.filter(func.date(Concert.date_time) >= func.date(reference_time))
     return query.order_by(Concert.date_time).all()
+
+
+def get_concerts_between_dates(db: Session, start: date, end: date) -> List[Concert]:
+    """Return concerts whose calendar date falls within `start`/`end`, inclusive.
+
+    Both bounds are inclusive and compared against `Concert.date_time`'s
+    calendar date (not exact timestamp), mirroring `is_past`/`get_upcoming_concerts`.
+    Ordered soonest first, by date ascending. Returns an empty list when no
+    concert falls in range.
+    """
+    return (
+        db.query(Concert)
+        .options(joinedload(Concert.venue))
+        .filter(func.date(Concert.date_time) >= start)
+        .filter(func.date(Concert.date_time) <= end)
+        .order_by(Concert.date_time)
+        .all()
+    )
 
 
 def get_next_concert(db: Session, reference_time: Optional[datetime] = None) -> Optional[Concert]:
