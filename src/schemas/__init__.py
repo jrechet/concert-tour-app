@@ -28,7 +28,7 @@ from .concert import (
     NextConcertCity,
 )
 from .lineup_entry import LineupEntryResponse
-from .lineup import LineupEntryCreate, LineupEntryOut
+from .lineup import LineupEntryCreate, LineupEntryOut, LineupReorderRequest
 from .occupancy import OccupancyResponse
 from .ticket import RefundRequest, TicketPurchaseRequest
 from .stats import (
@@ -69,6 +69,7 @@ __all__ = [
     "LineupEntryResponse",
     "LineupEntryCreate",
     "LineupEntryOut",
+    "LineupReorderRequest",
     "OccupancyResponse",
     "TicketPurchaseRequest",
     "RefundRequest",

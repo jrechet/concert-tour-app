@@ -32,6 +32,20 @@ class LineupEntryCreate(BaseModel):
         }
 
 
+class LineupReorderRequest(BaseModel):
+    """Schema for moving a lineup entry to a new running-order position."""
+
+    set_order: int = Field(..., ge=1, description="New running order position (1 plays first)")
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "set_order": 2,
+            }
+        }
+
+
 class LineupEntryOut(BaseModel):
     """Schema for lineup entry API responses."""
 

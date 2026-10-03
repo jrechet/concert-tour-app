@@ -27,6 +27,7 @@ from ..schemas import (
     LineupEntryCreate,
     LineupEntryOut,
     LineupEntryResponse,
+    LineupReorderRequest,
     NextConcertCity,
     NextConcertVenue,
     OccupancyResponse,
@@ -50,7 +51,12 @@ from ..services.concerts_service import (
     sell_tickets,
 )
 from ..services.concerts_service import get_upcoming_concerts as fetch_upcoming_concerts
-from ..services.lineup_service import LineupEntryNotFoundError, delete_lineup_entry
+from ..services.lineup_service import (
+    InvalidSetOrderError,
+    LineupEntryNotFoundError,
+    delete_lineup_entry,
+    reorder_lineup_entry,
+)
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
 api_router = APIRouter(prefix="/api/v1/concerts", tags=["concerts"])
@@ -593,6 +599,42 @@ def delete_concert_lineup_entry(concert_id: int, entry_id: int, db: Session = De
     except LineupEntryNotFoundError:
         raise HTTPException(status_code=404, detail="Lineup entry not found")
     return Response(status_code=204)
+
+
+@api_router.patch(
+    "/{concert_id}/lineup/{entry_id}",
+    response_model=LineupEntryOut,
+    responses={
+        404: {
+            "description": "No concert exists with the given `concert_id`, no lineup entry exists with the given `entry_id`, or the entry belongs to a different concert.",
+            "content": {"application/json": {"example": {"detail": "Concert not found"}}},
+        },
+        422: {
+            "description": "`set_order` is zero or negative.",
+            "content": {
+                "application/json": {"example": {"detail": "new_set_order must be a positive integer"}}
+            },
+        },
+    },
+)
+def reorder_concert_lineup_entry(
+    concert_id: int, entry_id: int, payload: LineupReorderRequest, db: Session = Depends(get_db)
+):
+    """Move a supporting act to a new running-order position, shifting
+    siblings to keep `set_order` contiguous within the concert.
+
+    Returns 404 when the concert doesn't exist, when the entry doesn't
+    exist, or when the entry belongs to a different concert. Returns 422
+    when `set_order` is not a positive integer.
+    """
+    try:
+        return reorder_lineup_entry(db, concert_id=concert_id, entry_id=entry_id, new_set_order=payload.set_order)
+    except ConcertNotFoundError:
+        raise HTTPException(status_code=404, detail="Concert not found")
+    except LineupEntryNotFoundError:
+        raise HTTPException(status_code=404, detail="Lineup entry not found")
+    except InvalidSetOrderError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @api_router.get(
