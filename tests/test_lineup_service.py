@@ -6,7 +6,12 @@ import pytest
 
 from src.models import LineupEntry
 from src.services.concerts_service import ConcertNotFoundError
-from src.services.lineup_service import LineupEntryNotFoundError, delete_lineup_entry
+from src.services.lineup_service import (
+    InvalidSetOrderError,
+    LineupEntryNotFoundError,
+    delete_lineup_entry,
+    reorder_lineup_entry,
+)
 from tests.fixtures.dashboard_fixtures import create_concert, create_tour, create_venues
 
 REFERENCE_TIME = datetime(2024, 6, 15, 18, 0, 0)
@@ -70,3 +75,81 @@ class TestDeleteLineupEntry:
 
         assert db_session.query(LineupEntry).filter(LineupEntry.id == keep.id).first() is not None
         assert db_session.query(LineupEntry).filter(LineupEntry.id == remove.id).first() is None
+
+
+class TestReorderLineupEntry:
+    """Coverage for `reorder_lineup_entry`."""
+
+    def test_moving_to_later_position_shifts_entries_between_down_by_one(self, db_session):
+        concert = _make_concert(db_session)
+        entries = [
+            _make_entry(db_session, concert, artist_name=f"Act {i}", set_order=i)
+            for i in range(1, 6)
+        ]
+        moved = entries[0]  # set_order 1
+
+        result = reorder_lineup_entry(db_session, concert.id, moved.id, new_set_order=4)
+
+        assert result.set_order == 4
+        for entry in entries:
+            db_session.refresh(entry)
+        assert entries[0].set_order == 4  # moved
+        assert entries[1].set_order == 1  # was 2
+        assert entries[2].set_order == 2  # was 3
+        assert entries[3].set_order == 3  # was 4
+        assert entries[4].set_order == 5  # unaffected
+
+    def test_moving_to_earlier_position_shifts_entries_between_up_by_one(self, db_session):
+        concert = _make_concert(db_session)
+        entries = [
+            _make_entry(db_session, concert, artist_name=f"Act {i}", set_order=i)
+            for i in range(1, 6)
+        ]
+        moved = entries[3]  # set_order 4
+
+        result = reorder_lineup_entry(db_session, concert.id, moved.id, new_set_order=2)
+
+        assert result.set_order == 2
+        for entry in entries:
+            db_session.refresh(entry)
+        assert entries[0].set_order == 1  # unaffected
+        assert entries[1].set_order == 3  # was 2
+        assert entries[2].set_order == 4  # was 3
+        assert entries[3].set_order == 2  # moved
+        assert entries[4].set_order == 5  # unaffected
+
+    def test_new_set_order_zero_raises_invalid_set_order_error(self, db_session):
+        concert = _make_concert(db_session)
+        entry = _make_entry(db_session, concert)
+
+        with pytest.raises(InvalidSetOrderError):
+            reorder_lineup_entry(db_session, concert.id, entry.id, new_set_order=0)
+
+    def test_new_set_order_negative_raises_invalid_set_order_error(self, db_session):
+        concert = _make_concert(db_session)
+        entry = _make_entry(db_session, concert)
+
+        with pytest.raises(InvalidSetOrderError):
+            reorder_lineup_entry(db_session, concert.id, entry.id, new_set_order=-1)
+
+    def test_raises_when_concert_does_not_exist(self, db_session):
+        with pytest.raises(ConcertNotFoundError):
+            reorder_lineup_entry(db_session, concert_id=999, entry_id=1, new_set_order=1)
+
+    def test_raises_when_entry_does_not_exist(self, db_session):
+        concert = _make_concert(db_session)
+
+        with pytest.raises(LineupEntryNotFoundError):
+            reorder_lineup_entry(db_session, concert.id, entry_id=999, new_set_order=1)
+
+    def test_raises_when_entry_belongs_to_a_different_concert(self, db_session):
+        concert_a = _make_concert(db_session)
+        concert_b = _make_concert(db_session)
+        entry = _make_entry(db_session, concert_b)
+
+        with pytest.raises(LineupEntryNotFoundError):
+            reorder_lineup_entry(db_session, concert_a.id, entry.id, new_set_order=1)
+
+        # The entry must survive untouched on its real concert.
+        db_session.refresh(entry)
+        assert entry.set_order == 1
