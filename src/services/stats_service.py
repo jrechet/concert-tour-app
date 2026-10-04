@@ -7,6 +7,7 @@ listing every venue in the table).
 """
 
 from collections import OrderedDict
+from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Tuple
 
@@ -161,3 +162,43 @@ def get_price_stats(db: Session) -> PriceStatsResponse:
         average=float(average),
         highest=float(highest),
     )
+
+
+@dataclass
+class CityRevenue:
+    """Revenue aggregated for a single city.
+
+    There is no dedicated `City` table in this schema -- `Venue.city` is a
+    plain string column -- so `city_id` is the city name itself, the only
+    stable identifier available to group venues/concerts by.
+    """
+
+    city_id: str
+    city_name: str
+    revenue: float
+
+
+def get_revenue_by_city(db: Session) -> List[CityRevenue]:
+    """Return per-city revenue for non-cancelled concerts, sorted by revenue
+    descending (ties broken by city name ascending).
+
+    Revenue is `tickets_sold * ticket_price` summed across a city's
+    concerts. A concert with no `ticket_price` set contributes 0 (it is not
+    excluded from the sum). Cancelled concerts are excluded entirely, so a
+    city whose concerts are all cancelled is absent from the result; a city
+    with only non-cancelled concerts that sum to 0 (e.g. zero tickets sold)
+    is still included, with `revenue` equal to 0.
+    """
+    revenue_expr = func.sum(Concert.tickets_sold * func.coalesce(Concert.ticket_price, 0))
+    rows = (
+        db.query(Venue.city, revenue_expr.label("revenue"))
+        .join(Concert, Concert.venue_id == Venue.id)
+        .filter(Concert.is_cancelled.is_(False))
+        .group_by(Venue.city)
+        .order_by(revenue_expr.desc(), Venue.city.asc())
+        .all()
+    )
+    return [
+        CityRevenue(city_id=city, city_name=city, revenue=float(revenue or 0))
+        for city, revenue in rows
+    ]
