@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db, get_reference_time
 from ..schemas import (
     CitiesResponse,
+    CityRevenueOut,
     CountResponse,
     CountryConcertCount,
     MonthlyConcertCount,
@@ -27,6 +28,7 @@ from ..services.stats_service import (
     get_distinct_cities,
     get_distinct_venue_names,
     get_price_stats,
+    get_revenue_by_city,
     get_upcoming_concert_count,
 )
 
@@ -109,6 +111,19 @@ def get_prices_stats(db: Session = Depends(get_db)):
     All three fields are `null` when there are no eligible concerts.
     """
     return get_price_stats(db)
+
+
+@router.get("/revenue/cities", response_model=List[CityRevenueOut])
+def get_revenue_by_city_stats(db: Session = Depends(get_db)):
+    """Retrieve per-city revenue for non-cancelled concerts, ordered by
+    revenue descending.
+
+    Returns 200 with an empty list (not an error) when there is no data.
+    """
+    return [
+        CityRevenueOut(city=entry.city_name, revenue=entry.revenue)
+        for entry in get_revenue_by_city(db)
+    ]
 
 
 @router.get("/weekdays", response_model=WeekdayStatsResponse)

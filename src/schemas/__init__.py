@@ -41,6 +41,7 @@ from .stats import (
     MonthlyConcertCount,
     MonthlyConcertCountResponse,
     PriceStatsResponse,
+    CityRevenueOut,
     WeekdayStatsResponse,
 )
 
@@ -82,5 +83,6 @@ __all__ = [
     "MonthlyConcertCount",
     "MonthlyConcertCountResponse",
     "PriceStatsResponse",
+    "CityRevenueOut",
     "WeekdayStatsResponse",
 ]
