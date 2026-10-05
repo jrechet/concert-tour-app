@@ -5,8 +5,10 @@ from decimal import Decimal
 
 import pytest
 
+from src.models import Concert, Tour
 from src.services.tour_service import (
     TourNotFoundError,
+    duplicate_tour,
     get_tour_cities,
     get_tour_revenue,
     get_tour_span,
@@ -162,6 +164,41 @@ class TestGetTourSpan:
     def test_unknown_tour_id_raises_tour_not_found_error(self, db_session):
         with pytest.raises(TourNotFoundError):
             get_tour_span(999999, db_session)
+
+
+class TestDuplicateTour:
+    """Coverage for `duplicate_tour`."""
+
+    def test_duplicates_tour_with_same_artist_planned_status_and_no_concerts(self, db_session):
+        venues = create_venues(db_session, count=1)
+        source = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        create_concert(db_session, source, venues[0], day_offset=0, ticket_price="80.00", base_time=BASE_TIME)
+
+        result = duplicate_tour(db_session, source.id)
+
+        assert result is not None
+        assert result.id != source.id
+        assert result.name == "Neon Skyline World Tour (copy)"
+        assert result.artist == source.artist
+        assert result.status == "planned"
+
+        persisted = db_session.query(Tour).filter(Tour.id == result.id).first()
+        assert persisted is not None
+        assert persisted.name == "Neon Skyline World Tour (copy)"
+
+        concert_count = (
+            db_session.query(Concert).filter(Concert.tour_id == result.id).count()
+        )
+        assert concert_count == 0
+
+    def test_unknown_tour_id_returns_none_and_writes_nothing(self, db_session):
+        result = duplicate_tour(db_session, 999999)
+
+        assert result is None
+        assert db_session.query(Tour).count() == 0
 
 
 class TestSearchByArtist:

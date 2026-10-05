@@ -8,6 +8,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..models import Concert, Tour, Venue
+from ..schemas.tour import TourStatus
 
 
 class TourRevenue(NamedTuple):
@@ -107,6 +108,32 @@ def get_tour_span(tour_id: int, db: Session) -> TourSpan:
         last_date=last_date,
         days_between=(last_date - first_date).days,
     )
+
+
+def duplicate_tour(db: Session, tour_id: int) -> Optional[Tour]:
+    """Duplicate a tour as a new, persisted `planned` tour with no concerts.
+
+    Copies `artist`, `start_date`, `end_date`, and `description` from the
+    source tour, and names the copy `f"{source.name} (copy)"`. The source
+    tour's concerts are not duplicated. Returns `None` when no tour with
+    `tour_id` exists, so the router can translate that into a 404.
+    """
+    source = db.query(Tour).filter(Tour.id == tour_id).first()
+    if source is None:
+        return None
+
+    duplicate = Tour(
+        name=f"{source.name} (copy)",
+        artist=source.artist,
+        start_date=source.start_date,
+        end_date=source.end_date,
+        description=source.description,
+        status=TourStatus.PLANNED.value,
+    )
+    db.add(duplicate)
+    db.commit()
+    db.refresh(duplicate)
+    return duplicate
 
 
 def search_by_artist(db: Session, artist: str) -> List[Tour]:
