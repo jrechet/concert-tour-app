@@ -26,6 +26,7 @@ from ..services.calendar_service import build_tour_calendar
 from ..services.occupancy import TourNotFoundError as OccupancyTourNotFoundError, get_tour_occupancy
 from ..services.tour_service import (
     TourNotFoundError,
+    duplicate_tour,
     get_tour_cities,
     get_tour_revenue,
     get_tour_span,
@@ -271,6 +272,18 @@ def cancel_tour(
 
     db.commit()
     return CancelTourResponse(cancelled_count=len(concerts))
+
+
+@router.post("/{tour_id}/duplicate", response_model=TourResponse, status_code=201)
+def duplicate_tour_endpoint(tour_id: int, db: Session = Depends(get_db)):
+    """Duplicate a tour as a new `planned` tour with no concerts.
+
+    Returns 404 if the source tour doesn't exist.
+    """
+    duplicate = duplicate_tour(db, tour_id)
+    if duplicate is None:
+        raise HTTPException(status_code=404, detail="Tour not found")
+    return duplicate
 
 
 @router.put("/{tour_id}", response_model=TourResponse)
