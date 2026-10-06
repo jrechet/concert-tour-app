@@ -2,6 +2,7 @@
 Pydantic schemas for API request/response validation.
 """
 
+from .artist import ArtistSummary
 from .tour import (
     TourStatus,
     TourCreate,
@@ -46,6 +47,7 @@ from .stats import (
 )
 
 __all__ = [
+    "ArtistSummary",
     "TourStatus",
     "TourCreate",
     "TourUpdate",
