@@ -1,0 +1,4 @@
+[project]
+name = "concert-tour-app"
+version = "1.0.0"
+description = "A FastAPI application for managing concert tours"
