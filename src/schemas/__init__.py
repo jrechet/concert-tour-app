@@ -28,6 +28,7 @@ from .concert import (
     NextConcertVenue,
     NextConcertCity,
 )
+from .venue import VenueCreate, VenueResponse
 from .lineup_entry import LineupEntryResponse
 from .lineup import LineupEntryCreate, LineupEntryOut, LineupReorderRequest
 from .occupancy import OccupancyResponse
@@ -48,6 +49,8 @@ from .stats import (
 
 __all__ = [
     "ArtistSummary",
+    "VenueCreate",
+    "VenueResponse",
     "TourStatus",
     "TourCreate",
     "TourUpdate",

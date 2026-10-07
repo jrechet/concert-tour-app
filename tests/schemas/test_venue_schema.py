@@ -5,7 +5,10 @@ Unit tests for ConcertSummary and VenueDetailResponse Pydantic schemas.
 from datetime import datetime
 from types import SimpleNamespace
 
-from src.schemas.venue import ConcertSummary, VenueDetailResponse
+import pytest
+from pydantic import ValidationError
+
+from src.schemas.venue import ConcertSummary, VenueCreate, VenueDetailResponse, VenueResponse
 
 
 def make_concert(id=1, date_time=None, status="confirmed", artist="The Headliners"):
@@ -103,3 +106,51 @@ class TestVenueDetailResponse:
     def test_upcoming_concerts_defaults_to_empty_list_when_omitted(self):
         response = VenueDetailResponse(id=1, name="Arena", city="Paris", country="France", capacity=None)
         assert response.upcoming_concerts == []
+
+
+class TestVenueCreate:
+    """Test cases for VenueCreate schema."""
+
+    def test_valid_payload_passes(self):
+        venue = VenueCreate(name="Madison Square Garden", city="New York", country="USA", capacity=20000)
+        assert venue.name == "Madison Square Garden"
+        assert venue.city == "New York"
+        assert venue.country == "USA"
+        assert venue.capacity == 20000
+
+    def test_capacity_zero_fails(self):
+        with pytest.raises(ValidationError):
+            VenueCreate(name="Arena", city="Paris", country="France", capacity=0)
+
+    def test_capacity_negative_fails(self):
+        with pytest.raises(ValidationError):
+            VenueCreate(name="Arena", city="Paris", country="France", capacity=-5)
+
+    def test_missing_name_fails(self):
+        with pytest.raises(ValidationError):
+            VenueCreate(city="Paris", country="France", capacity=5000)
+
+    def test_empty_name_fails(self):
+        with pytest.raises(ValidationError):
+            VenueCreate(name="", city="Paris", country="France", capacity=5000)
+
+    def test_whitespace_only_name_fails(self):
+        with pytest.raises(ValidationError):
+            VenueCreate(name="   ", city="Paris", country="France", capacity=5000)
+
+
+class TestVenueResponse:
+    """Test cases for VenueResponse schema."""
+
+    def test_serializes_venue_orm_instance(self):
+        venue = make_venue(id=3, name="Wembley Stadium", city="London", country="UK", capacity=90000)
+
+        response = VenueResponse.model_validate(venue)
+
+        assert response.model_dump() == {
+            "id": 3,
+            "name": "Wembley Stadium",
+            "city": "London",
+            "country": "UK",
+            "capacity": 90000,
+        }
