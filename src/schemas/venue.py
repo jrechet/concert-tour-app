@@ -5,7 +5,36 @@ Pydantic schemas for Venue entities.
 from datetime import datetime
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+class VenueCreate(BaseModel):
+    """Schema for creating a venue."""
+
+    name: str = Field(..., min_length=1, description="Venue name")
+    city: str = Field(..., description="City the venue is located in")
+    country: str = Field(..., description="Country the venue is located in")
+    capacity: int = Field(..., gt=0, description="Venue capacity")
+
+    @field_validator("name")
+    @classmethod
+    def name_must_not_be_blank(cls, v: str) -> str:
+        """Reject whitespace-only names."""
+        if not v.strip():
+            raise ValueError("name must not be empty or whitespace")
+        return v
+
+
+class VenueResponse(BaseModel):
+    """Schema for venue API responses, including the database id."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = Field(..., description="Unique venue identifier")
+    name: str = Field(..., description="Venue name")
+    city: str = Field(..., description="City the venue is located in")
+    country: str = Field(..., description="Country the venue is located in")
+    capacity: int = Field(..., description="Venue capacity")
 
 
 class VenueOut(BaseModel):
