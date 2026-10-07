@@ -1,4 +1,4 @@
-"""Query logic backing the venue-detail endpoint."""
+"""Query logic backing the venue-detail and venue-creation endpoints."""
 
 from typing import Optional
 
@@ -7,6 +7,36 @@ from sqlalchemy.orm import Session, contains_eager
 
 from ..database import get_reference_time
 from ..models import Concert, Venue
+from ..schemas.venue import VenueCreate
+
+
+def venue_name_city_exists(db: Session, name: str, city: str) -> bool:
+    """Return whether a venue with the given `name` and `city` already exists."""
+    return (
+        db.query(Venue.id)
+        .filter(Venue.name == name, Venue.city == city)
+        .first()
+        is not None
+    )
+
+
+def create_venue(db: Session, venue: VenueCreate) -> Venue:
+    """Persist a new venue from a validated `VenueCreate` payload.
+
+    Does not catch the (name, city) unique-constraint `IntegrityError`;
+    callers that need the pre-check/409 translation (e.g. the router) are
+    responsible for that, matching the lineup-entry creation pattern.
+    """
+    db_venue = Venue(
+        name=venue.name,
+        city=venue.city,
+        country=venue.country,
+        capacity=venue.capacity,
+    )
+    db.add(db_venue)
+    db.commit()
+    db.refresh(db_venue)
+    return db_venue
 
 
 def get_venue_with_upcoming_concerts(db: Session, venue_id: int) -> Optional[Venue]:
