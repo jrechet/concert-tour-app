@@ -34,7 +34,21 @@ class VenueResponse(BaseModel):
     name: str = Field(..., description="Venue name")
     city: str = Field(..., description="City the venue is located in")
     country: str = Field(..., description="Country the venue is located in")
-    capacity: int = Field(..., description="Venue capacity")
+    capacity: int = Field(..., ge=0, description="Venue capacity")
+
+
+class VenueListParams(BaseModel):
+    """Query parameters accepted by `GET /api/v1/venues`."""
+
+    min_capacity: Optional[int] = Field(None, description="Only return venues with at least this capacity")
+
+    @field_validator("min_capacity")
+    @classmethod
+    def min_capacity_must_not_be_negative(cls, v: Optional[int]) -> Optional[int]:
+        """Reject negative values."""
+        if v is not None and v < 0:
+            raise ValueError("min_capacity must not be negative")
+        return v
 
 
 class VenueOut(BaseModel):
