@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from database import create_tables
+from src.core.version import get_app_version
 
 
 @asynccontextmanager
@@ -15,7 +16,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Concert Tour App",
     description="A FastAPI application for managing concert tours",
-    version="1.0.0",
+    version=get_app_version(),
     lifespan=lifespan
 )
 

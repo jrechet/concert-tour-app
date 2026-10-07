@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 
+from .core.version import get_app_version
 from .database import engine, get_db
 from .models import Base, Concert
 from .routers import artists, concerts, stats, tours, venues
@@ -19,7 +20,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="Concert Tour API",
     description="API for managing concert tours and related data",
-    version="1.0.0"
+    version=get_app_version()
 )
 
 # CORS middleware
