@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 from pydantic import ValidationError
 
-from src.schemas.venue import ConcertSummary, VenueCreate, VenueDetailResponse, VenueResponse
+from src.schemas.venue import ConcertSummary, VenueCreate, VenueDetailResponse, VenueListParams, VenueResponse
 
 
 def make_concert(id=1, date_time=None, status="confirmed", artist="The Headliners"):
@@ -154,3 +154,27 @@ class TestVenueResponse:
             "country": "UK",
             "capacity": 90000,
         }
+
+    def test_negative_capacity_fails(self):
+        with pytest.raises(ValidationError):
+            VenueResponse(id=1, name="Arena", city="Paris", country="France", capacity=-1)
+
+
+class TestVenueListParams:
+    """Test cases for VenueListParams schema."""
+
+    def test_min_capacity_omitted_is_none(self):
+        params = VenueListParams()
+        assert params.min_capacity is None
+
+    def test_min_capacity_zero_passes(self):
+        params = VenueListParams(min_capacity=0)
+        assert params.min_capacity == 0
+
+    def test_min_capacity_positive_passes(self):
+        params = VenueListParams(min_capacity=5000)
+        assert params.min_capacity == 5000
+
+    def test_min_capacity_negative_fails(self):
+        with pytest.raises(ValidationError):
+            VenueListParams(min_capacity=-1)
