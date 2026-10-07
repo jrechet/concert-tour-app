@@ -18,6 +18,9 @@ def _create_venue(db_session, name, city, country, capacity):
 class TestListVenues:
     """Coverage for `list_venues`."""
 
+    def test_empty_table_returns_empty_list(self, db_session):
+        assert list_venues(db_session) == []
+
     def test_returns_venues_sorted_by_name_regardless_of_insertion_order(self, db_session):
         _create_venue(db_session, "Tokyo Dome", "Tokyo", "Japan", 42000)
         _create_venue(db_session, "Accor Arena", "Paris", "France", 15000)
@@ -38,6 +41,16 @@ class TestListVenues:
 
         assert [venue.name for venue in result] == [
             "Sydney Opera House", "United Center",
+        ]
+
+    def test_min_capacity_zero_returns_everything(self, db_session):
+        _create_venue(db_session, "Ryman Auditorium", "Nashville", "USA", 2362)
+        _create_venue(db_session, "United Center", "Chicago", "USA", 23500)
+
+        result = list_venues(db_session, min_capacity=0)
+
+        assert [venue.name for venue in result] == [
+            "Ryman Auditorium", "United Center",
         ]
 
     def test_negative_min_capacity_raises_value_error(self, db_session):
