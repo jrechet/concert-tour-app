@@ -1,16 +1,41 @@
-"""Venue listing and detail endpoints."""
+"""Venue listing, detail, and creation endpoints."""
 
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..crud.venue import get_venue_with_upcoming_concerts
+from ..crud.venue import create_venue, get_venue_with_upcoming_concerts, venue_name_city_exists
 from ..database import get_db
-from ..schemas.venue import VenueDetailResponse, VenueOut
+from ..schemas.venue import VenueCreate, VenueDetailResponse, VenueOut, VenueResponse
 from ..services.venue_service import list_venues
 
 router = APIRouter(prefix="/api/v1/venues", tags=["venues"])
+
+
+@router.post("", response_model=VenueResponse, status_code=201)
+def post_venue(venue: VenueCreate, db: Session = Depends(get_db)):
+    """Create a new venue.
+
+    Returns 409 when a venue with the same `name` and `city` already
+    exists. The conflict is pre-checked via a query (covering both the
+    common case and the test database, which is built from the models
+    without running migrations) and, in deployments where the (name,
+    city) unique constraint migration has been applied, also caught as a
+    fallback `IntegrityError` so a concurrent insert for the same pair
+    can never surface as a 500.
+    """
+    conflict_detail = f"A venue named '{venue.name}' already exists in {venue.city}"
+
+    if venue_name_city_exists(db, venue.name, venue.city):
+        raise HTTPException(status_code=409, detail=conflict_detail)
+
+    try:
+        return create_venue(db, venue)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=conflict_detail)
 
 
 @router.get("", response_model=List[VenueOut])
