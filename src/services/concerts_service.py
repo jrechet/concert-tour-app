@@ -3,6 +3,7 @@
 import csv
 import io
 from datetime import date, datetime, timezone
+from decimal import Decimal
 from typing import Iterator, List, Optional
 
 from sqlalchemy import func
@@ -301,6 +302,28 @@ def reschedule_concert(db: Session, concert_id: int, new_date_time: datetime) ->
         raise InvalidDateError(f"new_date_time {new_date_time} must be in the future")
 
     concert.date_time = new_date_time
+    db.commit()
+    db.refresh(concert)
+    return concert
+
+
+def update_ticket_price(db: Session, concert_id: int, new_price: Decimal) -> Concert:
+    """Set the ticket price for the concert identified by `concert_id`.
+
+    Raises `ConcertNotFoundError` when no such concert exists, and
+    `ConcertCancelledError` when the concert has been cancelled, leaving
+    its price untouched in that case. `new_price` is assumed to already be
+    validated as non-negative upstream (at the schema layer), so that rule
+    isn't reimplemented here. On success, updates `ticket_price`, commits,
+    and returns the updated concert.
+    """
+    concert = db.query(Concert).filter(Concert.id == concert_id).first()
+    if concert is None:
+        raise ConcertNotFoundError(f"Concert {concert_id} not found")
+    if concert.is_cancelled:
+        raise ConcertCancelledError(f"Concert {concert_id} is cancelled")
+
+    concert.ticket_price = new_price
     db.commit()
     db.refresh(concert)
     return concert
