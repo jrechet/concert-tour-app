@@ -27,6 +27,7 @@ from .concert import (
     ConcertNextResponse,
     NextConcertVenue,
     NextConcertCity,
+    TicketPriceUpdate,
 )
 from .venue import VenueCreate, VenueResponse
 from .lineup_entry import LineupEntryResponse
@@ -72,6 +73,7 @@ __all__ = [
     "ConcertNextResponse",
     "NextConcertVenue",
     "NextConcertCity",
+    "TicketPriceUpdate",
     "LineupEntryResponse",
     "LineupEntryCreate",
     "LineupEntryOut",

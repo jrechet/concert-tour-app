@@ -32,6 +32,7 @@ from ..schemas import (
     NextConcertVenue,
     OccupancyResponse,
     RefundRequest,
+    TicketPriceUpdate,
     TicketPurchaseRequest,
 )
 from ..services.concerts_service import (
@@ -49,6 +50,7 @@ from ..services.concerts_service import (
     refund_tickets,
     reschedule_concert,
     sell_tickets,
+    update_ticket_price,
 )
 from ..services.concerts_service import get_upcoming_concerts as fetch_upcoming_concerts
 from ..services.lineup_service import (
@@ -384,6 +386,40 @@ def reschedule_concert_endpoint(
         raise HTTPException(status_code=409, detail=str(exc))
     except InvalidDateError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+
+
+@api_router.patch(
+    "/{concert_id}/price",
+    response_model=ConcertResponse,
+    responses={
+        404: {
+            "description": "No concert exists with the given `concert_id`.",
+            "content": {"application/json": {"example": {"detail": "Concert not found"}}},
+        },
+        409: {
+            "description": "The concert has been cancelled and its price cannot be updated.",
+            "content": {"application/json": {"example": {"detail": "Concert 1 is cancelled"}}},
+        },
+        422: {
+            "description": "`ticket_price` is negative or missing.",
+        },
+    },
+)
+def update_concert_ticket_price(
+    concert_id: int, payload: TicketPriceUpdate, db: Session = Depends(get_db)
+):
+    """Update the ticket price for a concert.
+
+    Returns 404 for an unknown concert and 409 if the concert has been
+    cancelled. A negative `ticket_price` is rejected with a 422 by
+    `TicketPriceUpdate` itself.
+    """
+    try:
+        return update_ticket_price(db, concert_id, payload.ticket_price)
+    except ConcertNotFoundError:
+        raise HTTPException(status_code=404, detail="Concert not found")
+    except ConcertCancelledError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
 
 
 @api_router.put(
