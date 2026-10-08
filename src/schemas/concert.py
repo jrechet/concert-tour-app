@@ -69,6 +69,27 @@ class ConcertUpdate(BaseModel):
         }
 
 
+class TicketPriceUpdate(BaseModel):
+    """Schema for the request body of the update-ticket-price endpoint."""
+
+    ticket_price: Decimal = Field(..., description="New ticket price")
+
+    @validator("ticket_price")
+    def validate_ticket_price_not_negative(cls, v):
+        """Reject a negative ticket price."""
+        if v < 0:
+            raise ValueError("ticket_price must not be negative")
+        return v
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "ticket_price": "175.00",
+            }
+        }
+
+
 class CancelConcertRequest(BaseModel):
     """Schema for the request body of the cancel-concert endpoint."""
 
