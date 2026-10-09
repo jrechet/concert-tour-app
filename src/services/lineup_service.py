@@ -44,6 +44,21 @@ def delete_lineup_entry(db: Session, concert_id: int, entry_id: int) -> None:
     db.commit()
 
 
+def clear_lineup(db: Session, concert_id: int) -> None:
+    """Remove every supporting-act lineup entry from a concert.
+
+    Raises `ConcertNotFoundError` when no concert with `concert_id` exists.
+    Leaves the `Concert` row itself untouched, and is idempotent: calling
+    this on a concert whose lineup is already empty succeeds without error.
+    """
+    concert_exists = db.query(Concert.id).filter(Concert.id == concert_id).first()
+    if not concert_exists:
+        raise ConcertNotFoundError(f"Concert {concert_id} not found")
+
+    db.query(LineupEntry).filter(LineupEntry.concert_id == concert_id).delete()
+    db.commit()
+
+
 def reorder_lineup_entry(db: Session, concert_id: int, entry_id: int, new_set_order: int) -> LineupEntry:
     """Move a lineup entry to `new_set_order`, shifting siblings to keep
     `set_order` values contiguous within the concert.
