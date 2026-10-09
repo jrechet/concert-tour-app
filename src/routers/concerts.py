@@ -56,6 +56,7 @@ from ..services.concerts_service import get_upcoming_concerts as fetch_upcoming_
 from ..services.lineup_service import (
     InvalidSetOrderError,
     LineupEntryNotFoundError,
+    clear_lineup,
     delete_lineup_entry,
     reorder_lineup_entry,
 )
@@ -610,6 +611,29 @@ def create_concert_lineup_entry(
         raise HTTPException(status_code=409, detail=conflict_detail)
     db.refresh(entry)
     return entry
+
+
+@api_router.delete(
+    "/{concert_id}/lineup",
+    status_code=204,
+    responses={
+        404: {
+            "description": "No concert exists with the given `concert_id`.",
+            "content": {"application/json": {"example": {"detail": "Concert not found"}}},
+        },
+    },
+)
+def clear_concert_lineup(concert_id: int, db: Session = Depends(get_db)):
+    """Remove every supporting-act lineup entry from a concert.
+
+    Returns 404 when the concert doesn't exist. The concert's other data is
+    left untouched.
+    """
+    try:
+        clear_lineup(db, concert_id=concert_id)
+    except ConcertNotFoundError:
+        raise HTTPException(status_code=404, detail="Concert not found")
+    return Response(status_code=204)
 
 
 @api_router.delete(
