@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 from typing import List, NamedTuple, Optional
 
-from sqlalchemy import func
+from sqlalchemy import and_, case, func
 from sqlalchemy.orm import Session
 
 from ..models import Concert, Tour, Venue
@@ -134,6 +134,34 @@ def duplicate_tour(db: Session, tour_id: int) -> Optional[Tour]:
     db.commit()
     db.refresh(duplicate)
     return duplicate
+
+
+def get_sold_out_tours(db: Session) -> List[Tour]:
+    """Return tours where every non-cancelled concert is sold out.
+
+    A tour qualifies when it has at least one non-cancelled concert, and
+    all of those non-cancelled concerts have sold out their venue's
+    capacity (`tickets_sold >= capacity`). Tours with zero eligible
+    concerts (none at all, or all cancelled) are excluded. Computed via a
+    single grouped query comparing the count of non-cancelled concerts
+    against the count of non-cancelled, sold-out ones per tour, rather
+    than a Python loop.
+    """
+    is_sold_out = case(
+        (and_(Venue.capacity.isnot(None), Concert.tickets_sold >= Venue.capacity), 1),
+        else_=0,
+    )
+
+    qualifying_tour_ids = (
+        db.query(Concert.tour_id)
+        .join(Venue, Concert.venue_id == Venue.id)
+        .filter(Concert.is_cancelled.is_(False))
+        .group_by(Concert.tour_id)
+        .having(func.count(Concert.id) == func.sum(is_sold_out))
+        .scalar_subquery()
+    )
+
+    return db.query(Tour).filter(Tour.id.in_(qualifying_tour_ids)).all()
 
 
 def search_by_artist(db: Session, artist: str) -> List[Tour]:
