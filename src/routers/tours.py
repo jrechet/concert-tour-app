@@ -27,6 +27,7 @@ from ..services.occupancy import TourNotFoundError as OccupancyTourNotFoundError
 from ..services.tour_service import (
     TourNotFoundError,
     duplicate_tour,
+    get_sold_out_tours,
     get_tour_cities,
     get_tour_revenue,
     get_tour_span,
@@ -72,6 +73,12 @@ def get_tours(
 def search_tours_by_artist(artist: str = Query(...), db: Session = Depends(get_db)):
     """Search tours whose artist contains the given text, case-insensitively."""
     return search_by_artist(db, artist)
+
+
+@router.get("/sold-out", response_model=List[TourResponse])
+def get_sold_out_tours_endpoint(db: Session = Depends(get_db)):
+    """Retrieve tours where every non-cancelled concert is sold out."""
+    return get_sold_out_tours(db)
 
 
 @router.get("/{tour_id}", response_model=TourResponse)
