@@ -67,6 +67,12 @@ class Concert(Base):
         return max(self.venue.capacity - (self.tickets_sold or 0), 0)
 
     @property
+    def tickets_remaining(self):
+        """Alias for `remaining_tickets` matching the `tickets_`-prefixed
+        naming used elsewhere (e.g. `tickets_sold`)."""
+        return self.remaining_tickets
+
+    @property
     def percentage_sold(self):
         """Tickets sold as a percentage of venue capacity, rounded to 1
         decimal place, mirroring `OccupancyResponse.percentage_sold`.

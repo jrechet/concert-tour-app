@@ -56,3 +56,34 @@ def test_is_almost_sold_out_false_when_total_tickets_is_zero():
     concert = _make_concert(capacity=0, tickets_sold=0)
 
     assert concert.is_almost_sold_out is False
+
+
+def test_tickets_remaining_partial_sales():
+    concert = _make_concert(capacity=100, tickets_sold=40)
+
+    assert concert.tickets_remaining == 60
+
+
+def test_is_sold_out_true_when_no_tickets_remain():
+    concert = _make_concert(capacity=100, tickets_sold=100)
+
+    assert concert.tickets_remaining == 0
+    assert concert.is_sold_out is True
+
+
+def test_is_sold_out_false_when_tickets_remain():
+    concert = _make_concert(capacity=100, tickets_sold=40)
+
+    assert concert.is_sold_out is False
+
+
+def test_tickets_remaining_never_negative_when_oversold():
+    """A concert sold past its venue's capacity (e.g. the venue's capacity
+    was reduced after tickets were already sold) must clamp to 0 rather
+    than reporting a negative remaining count, and must still be sold out.
+    """
+    concert = _make_concert(capacity=100, tickets_sold=100)
+    concert.venue.capacity = 80
+
+    assert concert.tickets_remaining == 0
+    assert concert.is_sold_out is True
