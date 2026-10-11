@@ -132,3 +132,63 @@ class TestCancelTourEndpoint:
         response = client.post(f"/api/v1/tours/{tour.id}/cancel", json={"reason": "Tour ended"})
         assert response.status_code == 200
         assert response.json() == {"cancelled_count": 0}
+
+    def test_cancelling_tour_flags_cascaded_concerts_with_cancelled_with_tour(self, client, db_session):
+        base_time = REFERENCE_TIME
+        venues = create_venues(db_session, count=2)
+        tour = create_tour(
+            db_session, "Reunion Tour", "Test Artist",
+            (base_time - timedelta(days=10)).date(), (base_time + timedelta(days=30)).date(), "active",
+        )
+        concert_1 = create_concert(db_session, tour, venues[0], day_offset=1, ticket_price="80.00", base_time=base_time)
+        concert_2 = create_concert(db_session, tour, venues[1], day_offset=5, ticket_price="80.00", base_time=base_time)
+
+        response = client.post(
+            f"/api/v1/tours/{tour.id}/cancel",
+            json={"reason": "Venue unavailable"},
+        )
+        assert response.status_code == 200
+        assert response.json() == {"cancelled_count": 2}
+
+        db_session.refresh(concert_1)
+        db_session.refresh(concert_2)
+        assert concert_1.is_cancelled is True
+        assert concert_1.cancelled_with_tour is True
+        assert concert_2.is_cancelled is True
+        assert concert_2.cancelled_with_tour is True
+
+    def test_individually_cancelled_concert_keeps_cancelled_with_tour_false(self, client, db_session):
+        """A concert cancelled by a user before the tour is cancelled should
+        not be retroactively flagged as cancelled by the tour cascade."""
+        base_time = REFERENCE_TIME
+        venues = create_venues(db_session, count=1)
+        tour = create_tour(
+            db_session, "Patchwork Tour", "Test Artist",
+            (base_time - timedelta(days=10)).date(), (base_time + timedelta(days=30)).date(), "active",
+        )
+        pre_cancelled = create_concert(
+            db_session, tour, venues[0], day_offset=1, ticket_price="80.00", base_time=base_time,
+            is_cancelled=True, cancellation_reason="User cancelled individually",
+        )
+
+        response = client.post(
+            f"/api/v1/tours/{tour.id}/cancel",
+            json={"reason": "Tour cancelled"},
+        )
+        assert response.status_code == 200
+        assert response.json() == {"cancelled_count": 0}
+
+        db_session.refresh(pre_cancelled)
+        assert pre_cancelled.is_cancelled is True
+        assert pre_cancelled.cancellation_reason == "User cancelled individually"
+        assert pre_cancelled.cancelled_with_tour is False
+
+    def test_new_concert_defaults_cancelled_with_tour_to_false(self, db_session):
+        venues = create_venues(db_session, count=1)
+        tour = create_tour(
+            db_session, "Debut Tour", "Test Artist",
+            REFERENCE_TIME.date(), (REFERENCE_TIME + timedelta(days=30)).date(), "planned",
+        )
+        concert = create_concert(db_session, tour, venues[0], day_offset=1, ticket_price="80.00", base_time=REFERENCE_TIME)
+
+        assert concert.cancelled_with_tour is False
