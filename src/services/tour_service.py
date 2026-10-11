@@ -10,6 +10,12 @@ from sqlalchemy.orm import Session
 from ..models import Concert, Tour, Venue
 from ..schemas.tour import TourStatus
 
+# Not a `TourStatus` member: that enum is reserved for the statuses accepted
+# by `GET /tours`'s `status` query filter, and "cancelled" isn't one of them
+# (confirmed by `tests/test_tour_status_enum.py`). It's still a valid value
+# for `Tour.status` itself, set directly by the cancel/uncancel tour flow.
+CANCELLED_TOUR_STATUS = "cancelled"
+
 
 class TourRevenue(NamedTuple):
     """Ticket revenue for a tour, and the count of concerts it was summed over."""
@@ -20,6 +26,11 @@ class TourRevenue(NamedTuple):
 
 class TourNotFoundError(Exception):
     """Raised by `get_tour_span` when no tour with the given id exists."""
+
+
+class TourConflictError(Exception):
+    """Raised by `uncancel_tour` when the tour's status doesn't allow the
+    requested transition (e.g. uncancelling a tour that isn't cancelled)."""
 
 
 class TourSpan(NamedTuple):
@@ -134,6 +145,44 @@ def duplicate_tour(db: Session, tour_id: int) -> Optional[Tour]:
     db.commit()
     db.refresh(duplicate)
     return duplicate
+
+
+def uncancel_tour(db: Session, tour_id: int) -> Tour:
+    """Restore a cancelled tour to `planned`, along with any concerts that
+    were cancelled alongside it.
+
+    Raises `TourNotFoundError` when no tour with `tour_id` exists, and
+    `TourConflictError` when the tour's status isn't `cancelled` (the
+    message names its current status); in both cases no row is touched.
+    On success, sets the tour's status to `planned`, restores every
+    concert flagged `cancelled_with_tour` back to not-cancelled (also
+    clearing its `cancellation_reason` and resetting the flag to `False`),
+    leaves independently cancelled concerts (`cancelled_with_tour` is
+    `False`) untouched, commits once, and returns the refreshed tour.
+    """
+    tour = db.query(Tour).filter(Tour.id == tour_id).first()
+    if tour is None:
+        raise TourNotFoundError(f"Tour {tour_id} not found")
+    if tour.status != CANCELLED_TOUR_STATUS:
+        raise TourConflictError(
+            f"Tour {tour_id} is not cancelled (status: {tour.status})"
+        )
+
+    tour.status = TourStatus.PLANNED.value
+
+    concerts = (
+        db.query(Concert)
+        .filter(Concert.tour_id == tour_id, Concert.cancelled_with_tour.is_(True))
+        .all()
+    )
+    for concert in concerts:
+        concert.is_cancelled = False
+        concert.cancellation_reason = None
+        concert.cancelled_with_tour = False
+
+    db.commit()
+    db.refresh(tour)
+    return tour
 
 
 def get_sold_out_tours(db: Session) -> List[Tour]:
