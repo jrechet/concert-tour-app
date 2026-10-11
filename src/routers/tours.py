@@ -25,6 +25,7 @@ from ..schemas import (
 from ..services.calendar_service import build_tour_calendar
 from ..services.occupancy import TourNotFoundError as OccupancyTourNotFoundError, get_tour_occupancy
 from ..services.tour_service import (
+    TourConflictError,
     TourNotFoundError,
     duplicate_tour,
     get_sold_out_tours,
@@ -32,6 +33,7 @@ from ..services.tour_service import (
     get_tour_revenue,
     get_tour_span,
     search_by_artist,
+    uncancel_tour,
 )
 
 router = APIRouter(prefix="/api/v1/tours", tags=["tours"])
@@ -280,6 +282,29 @@ def cancel_tour(
 
     db.commit()
     return CancelTourResponse(cancelled_count=len(concerts))
+
+
+@router.post(
+    "/{tour_id}/uncancel",
+    response_model=TourResponse,
+    responses={
+        404: {"description": "Tour not found"},
+        409: {"description": "Tour is not cancelled"},
+    },
+)
+def uncancel_tour_endpoint(tour_id: int, db: Session = Depends(get_db)):
+    """Restore a cancelled tour to `planned`, along with any concerts that
+    were cancelled alongside it.
+
+    Returns 404 if the tour doesn't exist, 409 if the tour isn't currently
+    cancelled.
+    """
+    try:
+        return uncancel_tour(db, tour_id)
+    except TourNotFoundError:
+        raise HTTPException(status_code=404, detail="Tour not found")
+    except TourConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
 
 
 @router.post("/{tour_id}/duplicate", response_model=TourResponse, status_code=201)
