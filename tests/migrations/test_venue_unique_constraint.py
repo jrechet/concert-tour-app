@@ -24,6 +24,11 @@ from src.models import Venue
 # (name, city) constraint.
 _BASELINE_REVISION = "a3f8c1d4e7b2"
 
+# The revision under test. Targeted explicitly (rather than "head") so this
+# test stays pinned to the venues constraint migration regardless of
+# migrations added afterward.
+_TARGET_REVISION = "e6f0a9c3b4d7"
+
 
 @pytest.fixture
 def migrated_db(tmp_path, monkeypatch):
@@ -48,7 +53,7 @@ def migrated_db(tmp_path, monkeypatch):
 
     config = Config("alembic.ini")
     command.stamp(config, _BASELINE_REVISION)
-    command.upgrade(config, "head")
+    command.upgrade(config, _TARGET_REVISION)
 
     engine = sa.create_engine(db_url, connect_args={"check_same_thread": False})
     session = sessionmaker(autocommit=False, autoflush=False, bind=engine)()

@@ -276,6 +276,7 @@ def cancel_tour(
     for concert in concerts:
         concert.is_cancelled = True
         concert.cancellation_reason = payload.reason
+        concert.cancelled_with_tour = True
 
     db.commit()
     return CancelTourResponse(cancelled_count=len(concerts))
