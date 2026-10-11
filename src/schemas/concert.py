@@ -240,6 +240,13 @@ class ConcertResponse(BaseModel):
     remaining_tickets: Optional[int] = Field(
         None, description="Tickets still available; null when the venue's capacity is unknown"
     )
+    tickets_remaining: Optional[int] = Field(
+        None,
+        description=(
+            "Alias for `remaining_tickets`, using the `tickets_`-prefixed naming of "
+            "`tickets_sold`; null when the venue's capacity is unknown"
+        ),
+    )
     sold_out: bool = Field(..., description="Whether every ticket for this concert has been sold")
     is_sold_out: bool = Field(
         ..., description="Alias for `sold_out`, using the `is_`-prefixed naming of the other boolean fields"
@@ -270,6 +277,7 @@ class ConcertResponse(BaseModel):
                 "ticket_price": "150.00",
                 "tickets_sold": 15000,
                 "remaining_tickets": 5000,
+                "tickets_remaining": 5000,
                 "sold_out": False,
                 "is_sold_out": False,
                 "is_almost_sold_out": True,
