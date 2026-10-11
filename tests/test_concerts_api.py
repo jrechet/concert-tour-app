@@ -229,3 +229,63 @@ class TestIsSoldOutOnGetEndpoints:
         data = response.json()
         assert data["id"] == concert.id
         assert data["is_sold_out"] is False
+
+
+class TestTicketsRemainingAndSoldOutExposure:
+    """`tickets_remaining`/`sold_out` are exposed on both the list and
+    detail endpoints, derived from each concert's real venue relationship
+    (never a hardcoded/stored duplicate)."""
+
+    def test_list_concerts_includes_sold_out_flag(self, client, db_session):
+        """Every item in the list endpoint includes both sold_out and
+        tickets_remaining."""
+        tour, venue = _seed_tour_and_venue(db_session)
+        create_concert(
+            db_session, tour, venue, day_offset=10, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=10,
+        )
+
+        response = client.get("/api/v1/concerts/")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        for item in data:
+            assert "sold_out" in item
+            assert "tickets_remaining" in item
+
+    def test_get_concert_sold_out_true(self, client, db_session):
+        """The detail endpoint reports sold_out True and tickets_remaining
+        0 for a concert with no tickets left."""
+        tour, venue = _seed_tour_and_venue(db_session)
+        concert = create_concert(
+            db_session, tour, venue, day_offset=10, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=venue.capacity,
+        )
+
+        response = client.get(f"/api/v1/concerts/{concert.id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sold_out"] is True
+        assert data["tickets_remaining"] == 0
+
+    def test_get_concert_sold_out_false_with_remaining_count(self, client, db_session):
+        """The detail endpoint reports sold_out False and the correct
+        tickets_remaining count for a concert with tickets still available."""
+        tour, venue = _seed_tour_and_venue(db_session)
+        concert = create_concert(
+            db_session, tour, venue, day_offset=10, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=42,
+        )
+
+        response = client.get(f"/api/v1/concerts/{concert.id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sold_out"] is False
+        assert data["tickets_remaining"] == venue.capacity - 42
+
+    def test_get_unknown_concert_returns_404(self, client, db_session):
+        """The detail endpoint returns 404 with the existing error body for
+        an id that doesn't exist."""
+        response = client.get("/api/v1/concerts/999999")
+        assert response.status_code == 404
+        assert response.json() == {"detail": "Concert not found"}
