@@ -24,7 +24,10 @@
     {% endif %}
     {% if concert.sold_out %}
     <span class="ticket-badge ticket-badge-sold-out" role="status">Sold Out</span>
-    {% elif concert.remaining_tickets is not none %}
+    {% elif concert.is_almost_sold_out %}
+    <span class="ticket-badge ticket-badge-almost-sold-out" role="status">{{ "Almost sold out!"|e }}</span>
+    {% endif %}
+    {% if not concert.sold_out and concert.remaining_tickets is not none %}
     <span class="ticket-count">{{ concert.remaining_tickets }} tickets left</span>
     {% endif %}
     {% if concert.percentage_sold is not none %}

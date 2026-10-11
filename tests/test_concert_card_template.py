@@ -50,6 +50,36 @@ def test_card_hides_badge_when_tickets_remain(client, db_session):
     assert "badge-sold-out" not in response.text and "ticket-badge-sold-out" not in response.text
 
 
+def test_card_shows_almost_sold_out_badge_when_few_tickets_remain(client, db_session):
+    venue = create_venues(db_session, count=1)[0]
+    tour = _make_tour(db_session, "Almost Sold Out Tour")
+    create_concert(
+        db_session, tour, venue, day_offset=5, ticket_price="50.00",
+        base_time=datetime.now(), tickets_sold=venue.capacity - 1,
+    )
+
+    response = client.get("/api/v1/dashboard/concerts")
+
+    assert response.status_code == 200
+    assert "ticket-badge-almost-sold-out" in response.text
+    assert "Almost sold out!" in response.text
+
+
+def test_card_hides_almost_sold_out_badge_when_plenty_of_tickets_remain(client, db_session):
+    venue = create_venues(db_session, count=1)[0]
+    tour = _make_tour(db_session, "Plenty Of Tickets Tour")
+    create_concert(
+        db_session, tour, venue, day_offset=5, ticket_price="50.00",
+        base_time=datetime.now(), tickets_sold=0,
+    )
+
+    response = client.get("/api/v1/dashboard/concerts")
+
+    assert response.status_code == 200
+    assert "ticket-badge-almost-sold-out" not in response.text
+    assert "Almost sold out!" not in response.text
+
+
 def test_card_escapes_venue_name(client, db_session):
     venue = Venue(
         name="<script>alert('xss')</script>", city="Testville", country="USA", capacity=100,

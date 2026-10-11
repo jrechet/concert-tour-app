@@ -18,6 +18,9 @@
         {% endif %}
         <p class="concert-detail-venue">{{ concert.venue.name|e }}, {{ concert.venue.city|e }}</p>
         <p class="concert-detail-date">{{ concert.date_time.strftime('%b %d, %Y %I:%M %p') }}</p>
+        {% if concert.is_almost_sold_out %}
+        <span class="ticket-badge ticket-badge-almost-sold-out" role="status">{{ "Almost sold out!"|e }}</span>
+        {% endif %}
     </header>
 
     <section class="concert-lineup" aria-label="Lineup">
