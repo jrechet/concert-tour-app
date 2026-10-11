@@ -89,3 +89,36 @@ def test_concert_detail_returns_404_for_missing_concert(client):
     response = client.get("/concerts/999999")
 
     assert response.status_code == 404
+
+
+def test_concert_detail_shows_almost_sold_out_badge_when_few_tickets_remain(client, db_session):
+    base_time = datetime(2026, 10, 1, 20, 0, 0)
+    venue = create_venues(db_session, count=1)[0]
+    tour = create_tour(
+        db_session,
+        name="Neon Skyline World Tour",
+        artist="Aurora Belle",
+        start_date=base_time.date(),
+        end_date=(base_time + timedelta(days=30)).date(),
+        status="active",
+    )
+    concert = create_concert(
+        db_session, tour, venue, day_offset=0, ticket_price="95.00",
+        base_time=base_time, tickets_sold=venue.capacity - 1,
+    )
+
+    response = client.get(f"/concerts/{concert.id}")
+
+    assert response.status_code == 200
+    assert "ticket-badge-almost-sold-out" in response.text
+    assert "Almost sold out!" in response.text
+
+
+def test_concert_detail_hides_almost_sold_out_badge_when_plenty_of_tickets_remain(client, db_session):
+    concert = _build_concert(db_session)
+
+    response = client.get(f"/concerts/{concert.id}")
+
+    assert response.status_code == 200
+    assert "ticket-badge-almost-sold-out" not in response.text
+    assert "Almost sold out!" not in response.text
