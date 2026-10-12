@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db, get_reference_time
 from ..schemas import (
+    CapacityStats,
     CitiesResponse,
     CityRevenueOut,
     CountResponse,
@@ -21,6 +22,7 @@ from ..schemas import (
     WeekdayStatsResponse,
 )
 from ..services.stats_service import (
+    get_capacity_stats,
     get_concert_count,
     get_concert_counts_by_country,
     get_concert_counts_by_month,
@@ -124,6 +126,15 @@ def get_revenue_by_city_stats(db: Session = Depends(get_db)):
         CityRevenueOut(city=entry.city_name, revenue=entry.revenue)
         for entry in get_revenue_by_city(db)
     ]
+
+
+@router.get("/capacity", response_model=CapacityStats, status_code=200)
+def get_capacity(db: Session = Depends(get_db)):
+    """Retrieve seat capacity statistics over upcoming, non-cancelled concerts.
+
+    Returns 200 with 0/0/0 (not an error) when there is no eligible data.
+    """
+    return get_capacity_stats(db)
 
 
 @router.get("/weekdays", response_model=WeekdayStatsResponse)
