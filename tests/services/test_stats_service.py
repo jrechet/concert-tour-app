@@ -1,8 +1,15 @@
-"""Unit tests for `get_concerts_per_weekday` and `get_revenue_by_city`."""
+"""Unit tests for `get_concerts_per_weekday`, `get_revenue_by_city`, and
+`get_capacity_stats`."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from src.services.stats_service import CityRevenue, get_concerts_per_weekday, get_revenue_by_city
+from src.schemas.stats import CapacityStats
+from src.services.stats_service import (
+    CityRevenue,
+    get_capacity_stats,
+    get_concerts_per_weekday,
+    get_revenue_by_city,
+)
 from tests.fixtures.dashboard_fixtures import create_concert, create_tour, create_venues
 
 BASE_TIME = datetime(2024, 6, 17, 20, 0, 0)  # a Monday
@@ -213,3 +220,115 @@ class TestGetRevenueByCity:
         assert len(result) == 1
         assert isinstance(result[0], CityRevenue)
         assert result[0].city_id == venues[0].city
+
+
+class TestGetCapacityStats:
+    """Coverage for `get_capacity_stats`."""
+
+    def test_capacity_stats_empty_database_returns_zeros(self, db_session):
+        result = get_capacity_stats(db_session)
+
+        assert isinstance(result, CapacityStats)
+        assert result.total_capacity == 0
+        assert result.tickets_sold == 0
+        assert result.seats_left == 0
+
+    def test_capacity_stats_sums_upcoming_non_cancelled_concerts(self, db_session):
+        venues = create_venues(db_session, count=2)
+        tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            datetime.now().date(), (datetime.now() + timedelta(days=90)).date(), "active",
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=1, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=100,
+        )
+        create_concert(
+            db_session, tour, venues[1], day_offset=2, ticket_price="90.00",
+            base_time=datetime.now(), tickets_sold=200,
+        )
+
+        result = get_capacity_stats(db_session)
+
+        expected_capacity = venues[0].capacity + venues[1].capacity
+        assert result.total_capacity == expected_capacity
+        assert result.tickets_sold == 300
+        assert result.seats_left == expected_capacity - 300
+
+    def test_capacity_stats_excludes_cancelled_concerts(self, db_session):
+        venues = create_venues(db_session, count=2)
+        tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            datetime.now().date(), (datetime.now() + timedelta(days=90)).date(), "active",
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=1, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=100,
+        )
+        create_concert(
+            db_session, tour, venues[1], day_offset=2, ticket_price="90.00",
+            base_time=datetime.now(), tickets_sold=9999,
+            is_cancelled=True, cancellation_reason="Artist illness",
+        )
+
+        result = get_capacity_stats(db_session)
+
+        assert result.total_capacity == venues[0].capacity
+        assert result.tickets_sold == 100
+        assert result.seats_left == venues[0].capacity - 100
+
+    def test_capacity_stats_excludes_past_concerts(self, db_session):
+        venues = create_venues(db_session, count=2)
+        tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            (datetime.now() - timedelta(days=90)).date(), (datetime.now() + timedelta(days=90)).date(), "active",
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=-5, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=9999,
+        )
+        create_concert(
+            db_session, tour, venues[1], day_offset=1, ticket_price="90.00",
+            base_time=datetime.now(), tickets_sold=100,
+        )
+
+        result = get_capacity_stats(db_session)
+
+        assert result.total_capacity == venues[1].capacity
+        assert result.tickets_sold == 100
+        assert result.seats_left == venues[1].capacity - 100
+
+    def test_capacity_stats_all_concerts_cancelled_returns_zeros(self, db_session):
+        venues = create_venues(db_session, count=1)
+        tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            datetime.now().date(), (datetime.now() + timedelta(days=90)).date(), "active",
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=1, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=100,
+            is_cancelled=True, cancellation_reason="Venue unavailable",
+        )
+
+        result = get_capacity_stats(db_session)
+
+        assert result.total_capacity == 0
+        assert result.tickets_sold == 0
+        assert result.seats_left == 0
+
+    def test_capacity_stats_oversold_clamps_seats_left_to_zero(self, db_session):
+        venues = create_venues(db_session, count=1)
+        tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            datetime.now().date(), (datetime.now() + timedelta(days=90)).date(), "active",
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=1, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=venues[0].capacity + 250,
+        )
+
+        result = get_capacity_stats(db_session)
+
+        assert result.total_capacity == venues[0].capacity
+        assert result.tickets_sold == venues[0].capacity + 250
+        assert result.seats_left == 0
