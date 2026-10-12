@@ -46,6 +46,7 @@ from .stats import (
     PriceStatsResponse,
     CityRevenueOut,
     WeekdayStatsResponse,
+    CapacityStats,
 )
 
 __all__ = [
@@ -92,4 +93,5 @@ __all__ = [
     "PriceStatsResponse",
     "CityRevenueOut",
     "WeekdayStatsResponse",
+    "CapacityStats",
 ]

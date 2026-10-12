@@ -172,6 +172,24 @@ class CityRevenueOut(BaseModel):
         }
 
 
+class CapacityStats(BaseModel):
+    """Schema wrapping capacity statistics for a concert or tour."""
+
+    total_capacity: int = Field(..., ge=0, description="Total number of seats available")
+    tickets_sold: int = Field(..., ge=0, description="Number of tickets sold")
+    seats_left: int = Field(..., ge=0, description="Number of seats remaining")
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "total_capacity": 1000,
+                "tickets_sold": 250,
+                "seats_left": 750,
+            }
+        }
+
+
 class WeekdayStatsResponse(BaseModel):
     """Schema wrapping the number of concerts held on each day of the week."""
 
