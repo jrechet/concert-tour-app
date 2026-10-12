@@ -89,3 +89,4 @@
 {"timestamp":"2026-10-11T20:03:08.014044+00:00","date":"2026-10-11","repo":"jrechet/concert-tour-app","tokens":2491,"cost_usd":1.3719,"prs_opened":0,"prs_merged":0,"demo_status":"red","pr_numbers":[]}
 {"timestamp":"2026-10-11T20:13:32.391577+00:00","date":"2026-10-11","repo":"jrechet/concert-tour-app","tokens":0,"cost_usd":1.0643,"prs_opened":0,"prs_merged":0,"demo_status":"red","pr_numbers":[]}
 {"timestamp":"2026-10-12T08:10:42.960349+00:00","date":"2026-10-12","repo":"jrechet/concert-tour-app","tokens":3006,"cost_usd":3.7815,"prs_opened":3,"prs_merged":4,"demo_status":"red","pr_numbers":[645,646,647]}
+{"timestamp":"2026-10-12T17:55:21.658906+00:00","date":"2026-10-12","repo":"jrechet/concert-tour-app","tokens":4196,"cost_usd":7.4789,"prs_opened":4,"prs_merged":4,"demo_status":"red","pr_numbers":[653,654,655,656]}
