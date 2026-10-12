@@ -5,7 +5,7 @@ Unit tests for WeekdayStatsResponse Pydantic schema.
 import pytest
 from pydantic import ValidationError
 
-from src.schemas.stats import WeekdayStatsResponse
+from src.schemas.stats import CapacityStats, WeekdayStatsResponse
 
 
 WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
@@ -43,3 +43,31 @@ class TestWeekdayStatsResponse:
 
     def test_field_order_is_monday_to_sunday(self):
         assert list(WeekdayStatsResponse.model_fields.keys()) == WEEKDAYS
+
+
+def test_capacity_stats_accepts_positive_values():
+    stats = CapacityStats(total_capacity=1000, tickets_sold=250, seats_left=750)
+    assert stats.total_capacity == 1000
+    assert stats.tickets_sold == 250
+    assert stats.seats_left == 750
+
+
+def test_capacity_stats_accepts_zeros():
+    stats = CapacityStats(total_capacity=0, tickets_sold=0, seats_left=0)
+    assert stats.total_capacity == 0
+    assert stats.tickets_sold == 0
+    assert stats.seats_left == 0
+
+
+@pytest.mark.parametrize("field", ["total_capacity", "tickets_sold", "seats_left"])
+def test_capacity_stats_rejects_negative_values(field):
+    payload = {"total_capacity": 1000, "tickets_sold": 250, "seats_left": 750}
+    payload[field] = -1
+    with pytest.raises(ValidationError):
+        CapacityStats(**payload)
+
+
+def test_capacity_stats_serializes_expected_keys():
+    stats = CapacityStats(total_capacity=1000, tickets_sold=250, seats_left=750)
+    dumped = stats.model_dump()
+    assert set(dumped.keys()) == {"total_capacity", "tickets_sold", "seats_left"}
