@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Walkthrough — {{ overview.tour_name|e }}</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+<body>
+<main class="demo-walkthrough">
+    <header class="demo-walkthrough-header">
+        <h1>{{ overview.tour_name|e }}</h1>
+        <p class="demo-walkthrough-subtitle">
+            A step-by-step replay of the seeded demo: a band builds and
+            follows a tour, from first booking to ticket tiers.
+        </p>
+    </header>
+
+    <ol class="demo-walkthrough-steps">
+        <li class="demo-step" id="step-create-band">
+            <h2>1. Create a band</h2>
+            <p>
+                <strong>{{ overview.artist|e }}</strong> is the band behind this tour.
+                {% if overview.status %}Tour status: <span class="demo-tour-status">{{ overview.status|e }}</span>.{% endif %}
+            </p>
+        </li>
+
+        <li class="demo-step" id="step-add-venues">
+            <h2>2. Add venues</h2>
+            {% if cities %}
+            <ul class="demo-city-list" role="list">
+                {% for city in cities %}
+                <li class="demo-city-item">{{ city|e }}</li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p>No venues have been added yet.</p>
+            {% endif %}
+        </li>
+
+        <li class="demo-step" id="step-schedule-concerts">
+            <h2>3. Schedule concerts</h2>
+            <p>{{ overview.concert_count }} concert(s) scheduled across the tour.</p>
+        </li>
+
+        <li class="demo-step" id="step-track-upcoming-dates">
+            <h2>4. Track upcoming dates</h2>
+            <p>
+                {{ overview.upcoming_concert_count }} upcoming, {{ overview.past_concert_count }} past.
+            </p>
+
+            <form class="demo-city-filter" role="search">
+                <label for="demo-city-filter-select">Filter by city</label>
+                <select id="demo-city-filter-select"
+                        name="city"
+                        aria-label="Filter concerts by city"
+                        hx-get="/demo/concerts"
+                        hx-target="#demo-concert-list"
+                        hx-swap="innerHTML"
+                        hx-trigger="change">
+                    <option value="">All cities</option>
+                    {% for city in cities %}
+                    <option value="{{ city|e }}">{{ city|e }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+
+            <div id="demo-concert-list" aria-label="Concert list">
+                {% set concerts = overview.concerts %}
+                {% include "demo/_concert_list.html" %}
+            </div>
+        </li>
+
+        <li class="demo-step" id="step-ticket-tiers">
+            <h2>5. Ticket tiers</h2>
+            <p>Each concert above lists its own priced ticket tiers.</p>
+        </li>
+    </ol>
+</main>
+</body>
+</html>
