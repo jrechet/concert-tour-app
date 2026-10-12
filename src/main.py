@@ -41,6 +41,7 @@ app.include_router(venues.router)
 app.include_router(artists.router)
 app.include_router(version.router)
 app.include_router(demo.router)
+app.include_router(demo.page_router)
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))

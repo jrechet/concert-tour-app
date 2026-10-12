@@ -1,0 +1,28 @@
+{#
+  Concert list fragment for the demo walkthrough.
+
+  Rendered both inline (included from walkthrough.html on first load) and
+  standalone (returned by GET /demo/concerts for the hx-get city filter),
+  so this file never wraps itself in <html>/<body>. Read-only, like the
+  whole walkthrough: it never issues a data-modifying HTMX request.
+#}
+{% if concerts %}
+<ul class="demo-concert-list" role="list">
+    {% for concert in concerts %}
+    <li class="demo-concert-item">
+        <span class="demo-concert-venue">{{ concert.venue_name|e }}, {{ concert.city|e }}</span>
+        <span class="demo-concert-date">{{ concert.date_time.strftime('%b %d, %Y') }}</span>
+        <span class="demo-concert-status demo-concert-status-{{ concert.status|e }}">{{ concert.status|e }}</span>
+        {% if concert.ticket_tiers %}
+        <ul class="demo-ticket-tiers">
+            {% for tier in concert.ticket_tiers %}
+            <li class="demo-ticket-tier">{{ tier.name|e }}: ${{ tier.price|e }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p class="demo-concert-list-empty">No concerts match this city.</p>
+{% endif %}
