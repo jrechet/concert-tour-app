@@ -9,14 +9,14 @@ listing every venue in the table).
 from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import get_reference_time
 from ..models import Concert, Venue
-from ..schemas.stats import PriceStatsResponse
+from ..schemas.stats import CapacityStats, PriceStatsResponse
 
 _WEEKDAY_NAMES = [
     "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
@@ -202,3 +202,40 @@ def get_revenue_by_city(db: Session) -> List[CityRevenue]:
         CityRevenue(city_id=city, city_name=city, revenue=float(revenue or 0))
         for city, revenue in rows
     ]
+
+
+def get_capacity_stats(db: Session, reference_time: Optional[datetime] = None) -> CapacityStats:
+    """Compute seat capacity statistics over upcoming, non-cancelled concerts.
+
+    A concert is upcoming when its `date_time` is strictly later than
+    `reference_time` (defaulting to `get_reference_time()` when omitted).
+    Cancelled concerts are excluded entirely, matching `Concert.is_cancelled`.
+
+    `total_capacity` and `tickets_sold` are summed SQL-side (over the
+    venue's `capacity` and the concert's `tickets_sold` respectively);
+    `SUM` returning `NULL` on an empty filtered set is coalesced to 0 so an
+    empty/filtered-out result is `0`/`0`/`0` rather than `None`. `seats_left`
+    is derived once from those two totals and clamped to 0, since
+    `tickets_sold` can exceed `total_capacity` (e.g. a venue's capacity is
+    revised down after tickets were already sold).
+    """
+    if reference_time is None:
+        reference_time = get_reference_time()
+    total_capacity, tickets_sold = (
+        db.query(
+            func.coalesce(func.sum(Venue.capacity), 0),
+            func.coalesce(func.sum(Concert.tickets_sold), 0),
+        )
+        .select_from(Concert)
+        .join(Venue, Concert.venue_id == Venue.id)
+        .filter(Concert.date_time > reference_time)
+        .filter(Concert.is_cancelled.is_(False))
+        .one()
+    )
+    total_capacity = int(total_capacity)
+    tickets_sold = int(tickets_sold)
+    return CapacityStats(
+        total_capacity=total_capacity,
+        tickets_sold=tickets_sold,
+        seats_left=max(total_capacity - tickets_sold, 0),
+    )
