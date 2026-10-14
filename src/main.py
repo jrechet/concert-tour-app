@@ -36,6 +36,7 @@ app.add_middleware(
 app.include_router(tours.router)
 app.include_router(concerts.router)
 app.include_router(concerts.api_router)
+app.include_router(concerts.page_router)
 app.include_router(stats.router)
 app.include_router(venues.router)
 app.include_router(artists.router)

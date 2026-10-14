@@ -20,3 +20,7 @@ MAX_PAGE_SIZE = int(os.environ.get("MAX_PAGE_SIZE", "100"))
 # are exposed. Off by default so a production deployment doesn't expose demo
 # data unless explicitly opted in.
 DEMO_ENABLED = os.environ.get("DEMO_ENABLED", "false").strip().lower() in ("1", "true", "yes")
+
+# Debounce delay, in milliseconds, before the concert list's city search box
+# fires its HTMX request after the user stops typing.
+CITY_SEARCH_DEBOUNCE_MS = int(os.environ.get("CITY_SEARCH_DEBOUNCE_MS", "300"))
