@@ -8,6 +8,7 @@ venue_id=1.
 
 from datetime import datetime, timedelta
 
+from src.services.concerts_service import MAX_CITY_QUERY_LENGTH
 from tests.fixtures.dashboard_fixtures import create_concert, create_tour, create_venues
 
 
@@ -289,3 +290,89 @@ class TestTicketsRemainingAndSoldOutExposure:
         response = client.get("/api/v1/concerts/999999")
         assert response.status_code == 404
         assert response.json() == {"detail": "Concert not found"}
+
+
+class TestConcertListCityQueryParam:
+    """`GET /api/v1/concerts/` accepts an optional `city` filter, narrowed
+    to concerts whose venue city contains the given text."""
+
+    def _seed_three_cities(self, db_session):
+        tour = create_tour(
+            db_session,
+            name="City Filter Tour",
+            artist="Test Artist",
+            start_date=(datetime.now() - timedelta(days=1)).date(),
+            end_date=(datetime.now() + timedelta(days=90)).date(),
+            status="active",
+        )
+        venues = create_venues(db_session, count=3)  # New York, London, Paris
+        base_time = datetime.now()
+        for i, venue in enumerate(venues):
+            create_concert(db_session, tour, venue, day_offset=i, ticket_price="50.00", base_time=base_time)
+        return venues
+
+    def test_no_city_param_returns_all_concerts(self, client, db_session):
+        """Omitting `city` returns every concert, unchanged from before this
+        filter existed."""
+        venues = self._seed_three_cities(db_session)
+
+        response = client.get("/api/v1/concerts/")
+
+        assert response.status_code == 200
+        assert len(response.json()) == len(venues)
+
+    def test_city_param_filters_to_matching_city(self, client, db_session):
+        venues = self._seed_three_cities(db_session)
+        paris = next(v for v in venues if v.city == "Paris")
+
+        response = client.get("/api/v1/concerts/", params={"city": "Paris"})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["venue_id"] == paris.id
+
+    def test_city_param_matches_case_insensitive_partial_text(self, client, db_session):
+        venues = self._seed_three_cities(db_session)
+        paris = next(v for v in venues if v.city == "Paris")
+
+        response = client.get("/api/v1/concerts/", params={"city": "par"})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["venue_id"] == paris.id
+
+    def test_empty_city_param_returns_all_concerts(self, client, db_session):
+        venues = self._seed_three_cities(db_session)
+
+        response = client.get("/api/v1/concerts/", params={"city": ""})
+
+        assert response.status_code == 200
+        assert len(response.json()) == len(venues)
+
+    def test_whitespace_only_city_param_returns_all_concerts(self, client, db_session):
+        venues = self._seed_three_cities(db_session)
+
+        response = client.get("/api/v1/concerts/", params={"city": "  "})
+
+        assert response.status_code == 200
+        assert len(response.json()) == len(venues)
+
+    def test_city_with_no_matches_returns_empty_list_not_404(self, client, db_session):
+        self._seed_three_cities(db_session)
+
+        response = client.get("/api/v1/concerts/", params={"city": "Atlantis"})
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_over_length_city_param_returns_422_with_json_error(self, client, db_session):
+        """A `city` value longer than `MAX_CITY_QUERY_LENGTH` is rejected
+        with a 422 and a JSON error body, not a 500."""
+        too_long = "a" * (MAX_CITY_QUERY_LENGTH + 1)
+
+        response = client.get("/api/v1/concerts/", params={"city": too_long})
+
+        assert response.status_code == 422
+        assert "detail" in response.json()
