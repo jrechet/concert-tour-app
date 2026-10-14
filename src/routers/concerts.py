@@ -36,6 +36,7 @@ from ..schemas import (
     TicketPurchaseRequest,
 )
 from ..services.concerts_service import (
+    MAX_CITY_QUERY_LENGTH,
     ConcertCancelledError,
     ConcertCapacityExceededError,
     ConcertNotFoundError,
@@ -119,7 +120,9 @@ def get_concerts(
         None, ge=1, le=MAX_PAGE_SIZE, description="Deprecated alias for `page_size`; overrides it when given"
     ),
     city: Optional[str] = Query(
-        None, description="Filter concerts to venues whose city contains this text (case-insensitive)"
+        None,
+        max_length=MAX_CITY_QUERY_LENGTH,
+        description="Filter concerts to venues whose city contains this text (case-insensitive)",
     ),
     venue: Optional[str] = Query(
         None, description="Filter concerts to the venue whose name matches this text (case-insensitive)"
@@ -178,6 +181,9 @@ def get_concerts(
     compared against a threshold; when neither bound is given, such concerts
     are still included, unchanged from prior behavior.
     """
+    if city is not None:
+        city = city.strip()
+
     is_past = case(
         (func.date(Concert.date_time) < func.date(reference_time), 1),
         else_=0,
