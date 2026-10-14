@@ -1,0 +1,27 @@
+{#
+  Concert list rows, shared by the full concert list page (included inline
+  on first load) and the HTMX city search box (returned standalone by
+  GET /concerts when the request carries the `HX-Request` header). Never
+  wraps itself in <html>/layout markup so it can be swapped in directly.
+#}
+{% if concerts %}
+<ul class="concert-rows" role="list">
+    {% for concert in concerts %}
+    <li class="concert-row">
+        <span class="concert-row-date">{{ concert.date_time.strftime('%b %d, %Y') }}</span>
+        <span class="concert-row-venue">{{ concert.venue.name|e }}, {{ concert.venue.city|e }}</span>
+        {% if concert.is_cancelled %}
+        <span class="cancellation-badge" role="status">Cancelled</span>
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p class="concert-rows-empty">
+    {% if city %}
+    No concerts found for "{{ city|e }}".
+    {% else %}
+    No concerts scheduled yet.
+    {% endif %}
+</p>
+{% endif %}

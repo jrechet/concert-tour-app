@@ -7,14 +7,14 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 from sqlalchemy import case, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
-from ..config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from ..config import CITY_SEARCH_DEBOUNCE_MS, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from ..database import get_db, get_reference_time
 from ..models import Concert, LineupEntry, Tour, Venue
 from ..schemas import (
@@ -64,6 +64,7 @@ from ..services.lineup_service import (
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
 api_router = APIRouter(prefix="/api/v1/concerts", tags=["concerts"])
+page_router = APIRouter(tags=["concerts-page"])
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -814,3 +815,46 @@ def get_dashboard_concerts(
             "reference_time": reference_time,
         },
     )
+
+
+@page_router.get("/concerts", response_class=HTMLResponse)
+def get_concert_list(
+    request: Request,
+    city: Optional[str] = Query(
+        None,
+        max_length=MAX_CITY_QUERY_LENGTH,
+        description="Filter concerts to venues whose city contains this text (case-insensitive)",
+    ),
+    db: Session = Depends(get_db),
+):
+    """Render the concert list page with a debounced city search box.
+
+    A plain request renders the full page (search box plus every concert);
+    a request carrying the `HX-Request` header — sent by the search box's
+    `hx-get` on keyup — renders only the rows partial, so the same markup
+    backs both the initial page load and every subsequent HTMX swap. A
+    blank/omitted `city` shows every concert; a city with no matches
+    renders a visible empty-state message rather than an error.
+    """
+    normalized_city = city.strip() if city and city.strip() else None
+
+    query = db.query(Concert).options(joinedload(Concert.venue)).order_by(Concert.date_time)
+    if normalized_city:
+        query = query.join(Concert.venue).filter(
+            func.lower(Venue.city).contains(normalized_city.lower())
+        )
+    concerts = query.all()
+
+    context = {
+        "concerts": concerts,
+        "city": normalized_city,
+        "city_max_length": MAX_CITY_QUERY_LENGTH,
+        "city_search_debounce_ms": CITY_SEARCH_DEBOUNCE_MS,
+    }
+
+    template_name = (
+        "concerts/_concert_rows.html"
+        if request.headers.get("HX-Request") == "true"
+        else "concerts/list.html"
+    )
+    return templates.TemplateResponse(request, template_name, context)

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Concert List</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+<body>
+<main class="concert-list-page">
+    <h1>Concerts</h1>
+
+    <form class="concert-list-search" role="search">
+        <label for="concert-city-search-input">Filter by city</label>
+        <input type="search"
+               id="concert-city-search-input"
+               name="city"
+               class="concert-search-input"
+               placeholder="Filter by city"
+               autocomplete="off"
+               maxlength="{{ city_max_length }}"
+               value="{{ city|default('', true)|e }}"
+               aria-label="Filter concerts by city"
+               hx-get="/concerts"
+               hx-trigger="keyup changed delay:{{ city_search_debounce_ms }}ms, search"
+               hx-target="#concert-list"
+               hx-swap="innerHTML">
+    </form>
+
+    <div id="concert-list" aria-label="Concert list">
+        {% include "concerts/_concert_rows.html" %}
+    </div>
+</main>
+</body>
+</html>
