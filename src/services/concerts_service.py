@@ -16,6 +16,8 @@ from ..schemas.occupancy import OccupancyResponse
 
 CSV_HEADER = ["date", "city", "venue", "tour"]
 
+MAX_CITY_QUERY_LENGTH = 100
+
 
 class ConcertNotFoundError(Exception):
     """Raised by `sell_tickets` when no concert with the given id exists."""
@@ -73,6 +75,32 @@ def is_past(concert: Concert, reference_time: Optional[datetime] = None) -> bool
     if reference_time is None:
         reference_time = get_reference_time()
     return concert.date_time.date() < reference_time.date()
+
+
+def list_concerts(db: Session, city: Optional[str] = None) -> List[Concert]:
+    """Return every concert, ordered by date ascending, optionally narrowed
+    to those whose venue city matches `city`.
+
+    `city` is stripped of surrounding whitespace; when the result is `None`
+    or empty, every concert is returned, unfiltered. Otherwise, concerts are
+    narrowed via a case-insensitive partial match (`ILIKE`-style `contains`)
+    against the venue's city, joined through the real `Concert.venue`
+    foreign key rather than a denormalised column. Raises `ValueError` when
+    `city` exceeds `MAX_CITY_QUERY_LENGTH` characters.
+    """
+    if city is not None:
+        city = city.strip()
+        if len(city) > MAX_CITY_QUERY_LENGTH:
+            raise ValueError(
+                f"city must not exceed {MAX_CITY_QUERY_LENGTH} characters"
+            )
+
+    query = db.query(Concert).options(joinedload(Concert.venue)).order_by(Concert.date_time)
+
+    if city:
+        query = query.join(Concert.venue).filter(func.lower(Venue.city).contains(city.lower()))
+
+    return query.all()
 
 
 def get_upcoming_concerts(
