@@ -5,7 +5,13 @@ Unit tests for CancelTour Pydantic schemas.
 import pytest
 from pydantic import ValidationError
 
-from src.schemas.tour import CancelTourRequest, CancelTourResponse, TourCitiesResponse
+from src.schemas.tour import (
+    CancelTourRequest,
+    CancelTourResponse,
+    TourCancelRequest,
+    TourCancelResponse,
+    TourCitiesResponse,
+)
 
 
 class TestCancelTourRequest:
@@ -42,6 +48,34 @@ class TestCancelTourResponse:
     def test_missing_cancelled_count_raises(self):
         with pytest.raises(ValidationError):
             CancelTourResponse()
+
+
+class TestTourCancelRequest:
+    """Test cases for TourCancelRequest schema."""
+
+    def test_missing_reason_raises(self):
+        with pytest.raises(ValidationError):
+            TourCancelRequest()
+
+    def test_empty_reason_raises(self):
+        with pytest.raises(ValidationError):
+            TourCancelRequest(reason="")
+
+    def test_whitespace_only_reason_raises(self):
+        with pytest.raises(ValidationError):
+            TourCancelRequest(reason="   ")
+
+    def test_reason_is_trimmed(self):
+        request = TourCancelRequest(reason="  Singer ill  ")
+        assert request.reason == "Singer ill"
+
+
+class TestTourCancelResponse:
+    """Test cases for TourCancelResponse schema."""
+
+    def test_valid_payload_serialises_as_expected(self):
+        response = TourCancelResponse(tour_id=1, cancelled_count=3)
+        assert response.dict() == {"tour_id": 1, "cancelled_count": 3}
 
 
 class TestTourCitiesResponse:
