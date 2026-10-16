@@ -27,6 +27,7 @@ from ..services.occupancy import TourNotFoundError as OccupancyTourNotFoundError
 from ..services.tour_service import (
     TourConflictError,
     TourNotFoundError,
+    cancel_tour,
     duplicate_tour,
     get_sold_out_tours,
     get_tour_cities,
@@ -247,7 +248,7 @@ def get_tour_occupancy_endpoint(tour_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{tour_id}/cancel", response_model=CancelTourResponse)
-def cancel_tour(
+def cancel_tour_endpoint(
     tour_id: int,
     payload: CancelTourRequest,
     db: Session = Depends(get_db),
@@ -261,27 +262,11 @@ def cancel_tour(
     (the same-day boundary is inclusive). Returns the count of
     concerts newly cancelled by this call.
     """
-    tour_exists = db.query(Tour.id).filter(Tour.id == tour_id).first()
-    if not tour_exists:
+    try:
+        cancelled_count = cancel_tour(db, tour_id, payload.reason, reference_time)
+    except TourNotFoundError:
         raise HTTPException(status_code=404, detail="Tour not found")
-
-    concerts = (
-        db.query(Concert)
-        .filter(
-            Concert.tour_id == tour_id,
-            Concert.is_cancelled.is_(False),
-            func.date(Concert.date_time) >= func.date(reference_time),
-        )
-        .all()
-    )
-
-    for concert in concerts:
-        concert.is_cancelled = True
-        concert.cancellation_reason = payload.reason
-        concert.cancelled_with_tour = True
-
-    db.commit()
-    return CancelTourResponse(cancelled_count=len(concerts))
+    return CancelTourResponse(cancelled_count=cancelled_count)
 
 
 @router.post(
