@@ -1,12 +1,13 @@
 """Query logic backing tour-level aggregates, such as ticket revenue."""
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import List, NamedTuple, Optional
 
 from sqlalchemy import and_, case, func
 from sqlalchemy.orm import Session
 
+from ..database import get_reference_time
 from ..models import Concert, Tour, Venue
 from ..schemas.tour import TourStatus
 
@@ -145,6 +146,50 @@ def duplicate_tour(db: Session, tour_id: int) -> Optional[Tour]:
     db.commit()
     db.refresh(duplicate)
     return duplicate
+
+
+def cancel_tour(
+    db: Session,
+    tour_id: int,
+    reason: str,
+    reference_time: Optional[datetime] = None,
+) -> int:
+    """Cancel every upcoming, not-yet-cancelled concert on a tour.
+
+    "Upcoming" means scheduled today or later, compared by calendar date
+    against `reference_time` (defaulting to `get_reference_time()` when
+    omitted), so a concert on the same calendar day counts as upcoming.
+    Past concerts and concerts already marked cancelled are left
+    untouched. Each newly cancelled concert gets `reason` stored on
+    `cancellation_reason` and `cancelled_with_tour` set to `True`, so
+    `uncancel_tour` can later tell them apart from independently
+    cancelled concerts. Raises `TourNotFoundError` when no tour with
+    `tour_id` exists. Commits once and returns the count of concerts
+    newly cancelled by this call.
+    """
+    if reference_time is None:
+        reference_time = get_reference_time()
+
+    if db.query(Tour.id).filter(Tour.id == tour_id).first() is None:
+        raise TourNotFoundError(f"Tour {tour_id} not found")
+
+    concerts = (
+        db.query(Concert)
+        .filter(
+            Concert.tour_id == tour_id,
+            Concert.is_cancelled.is_(False),
+            func.date(Concert.date_time) >= func.date(reference_time),
+        )
+        .all()
+    )
+
+    for concert in concerts:
+        concert.is_cancelled = True
+        concert.cancellation_reason = reason
+        concert.cancelled_with_tour = True
+
+    db.commit()
+    return len(concerts)
 
 
 def uncancel_tour(db: Session, tour_id: int) -> Tour:
