@@ -9,9 +9,9 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from ..database import get_db, get_reference_time
 from ..models import Concert, Tour, Venue
 from ..schemas import (
-    CancelTourRequest,
-    CancelTourResponse,
     ConcertResponse,
+    TourCancelRequest,
+    TourCancelResponse,
     TourCitiesResponse,
     TourCreate,
     TourUpdate,
@@ -247,10 +247,10 @@ def get_tour_occupancy_endpoint(tour_id: int, db: Session = Depends(get_db)):
     )
 
 
-@router.post("/{tour_id}/cancel", response_model=CancelTourResponse)
+@router.post("/{tour_id}/cancel", response_model=TourCancelResponse)
 def cancel_tour_endpoint(
     tour_id: int,
-    payload: CancelTourRequest,
+    payload: TourCancelRequest,
     db: Session = Depends(get_db),
     reference_time: datetime = Depends(get_reference_time),
 ):
@@ -259,14 +259,14 @@ def cancel_tour_endpoint(
     Returns 404 if the tour doesn't exist. Past concerts and concerts
     already marked cancelled are left untouched. A concert scheduled on
     the same calendar day as `reference_time` is treated as upcoming
-    (the same-day boundary is inclusive). Returns the count of
-    concerts newly cancelled by this call.
+    (the same-day boundary is inclusive). Returns the tour id and the
+    count of concerts newly cancelled by this call.
     """
     try:
         cancelled_count = cancel_tour(db, tour_id, payload.reason, reference_time)
     except TourNotFoundError:
         raise HTTPException(status_code=404, detail="Tour not found")
-    return CancelTourResponse(cancelled_count=cancelled_count)
+    return TourCancelResponse(tour_id=tour_id, cancelled_count=cancelled_count)
 
 
 @router.post(

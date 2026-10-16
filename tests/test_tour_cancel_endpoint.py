@@ -52,7 +52,7 @@ class TestCancelTourEndpoint:
             json={"reason": "Artist illness"},
         )
         assert response.status_code == 200
-        assert response.json() == {"cancelled_count": 2}
+        assert response.json() == {"tour_id": tour.id, "cancelled_count": 2}
 
         db_session.refresh(past)
         db_session.refresh(upcoming_1)
@@ -114,7 +114,7 @@ class TestCancelTourEndpoint:
             json={"reason": "Artist illness"},
         )
         assert response.status_code == 200
-        assert response.json() == {"cancelled_count": 1}
+        assert response.json() == {"tour_id": tour.id, "cancelled_count": 1}
 
         db_session.refresh(same_day)
         assert same_day.is_cancelled is True
@@ -131,7 +131,7 @@ class TestCancelTourEndpoint:
 
         response = client.post(f"/api/v1/tours/{tour.id}/cancel", json={"reason": "Tour ended"})
         assert response.status_code == 200
-        assert response.json() == {"cancelled_count": 0}
+        assert response.json() == {"tour_id": tour.id, "cancelled_count": 0}
 
     def test_cancelling_tour_flags_cascaded_concerts_with_cancelled_with_tour(self, client, db_session):
         base_time = REFERENCE_TIME
@@ -148,7 +148,7 @@ class TestCancelTourEndpoint:
             json={"reason": "Venue unavailable"},
         )
         assert response.status_code == 200
-        assert response.json() == {"cancelled_count": 2}
+        assert response.json() == {"tour_id": tour.id, "cancelled_count": 2}
 
         db_session.refresh(concert_1)
         db_session.refresh(concert_2)
@@ -176,7 +176,7 @@ class TestCancelTourEndpoint:
             json={"reason": "Tour cancelled"},
         )
         assert response.status_code == 200
-        assert response.json() == {"cancelled_count": 0}
+        assert response.json() == {"tour_id": tour.id, "cancelled_count": 0}
 
         db_session.refresh(pre_cancelled)
         assert pre_cancelled.is_cancelled is True
