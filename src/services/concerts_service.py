@@ -174,14 +174,15 @@ def get_sold_out_concerts(db: Session, reference_time: Optional[datetime] = None
     via the real `Concert.venue` relationship rather than a hardcoded
     number). Concerts whose venue has no known capacity can't be sold
     out and are excluded. Ordered soonest first, by date ascending.
-    Eager-loads `Concert.venue` via `joinedload` to avoid N+1 queries.
+    Eager-loads `Concert.venue`/`Concert.tour` via `joinedload` to avoid
+    N+1 queries.
     """
     if reference_time is None:
         reference_time = get_reference_time()
     return (
         db.query(Concert)
         .join(Venue, Concert.venue_id == Venue.id)
-        .options(joinedload(Concert.venue))
+        .options(joinedload(Concert.venue), joinedload(Concert.tour))
         .filter(Concert.date_time >= reference_time)
         .filter(Concert.is_cancelled.is_(False))
         .filter(Venue.capacity.isnot(None))

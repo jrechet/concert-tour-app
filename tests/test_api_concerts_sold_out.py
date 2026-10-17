@@ -31,90 +31,24 @@ def frozen_reference_time():
         app.dependency_overrides[get_reference_time] = previous_override
 
 
-class TestSoldOutConcerts:
+def _make_sold_out_concert(db_session, tour_name, day_offset, venue=None):
+    venue = venue or create_venues(db_session, count=1)[0]
+    tour = create_tour(
+        db_session, tour_name, "Test Artist",
+        REFERENCE_TIME.date(),
+        (REFERENCE_TIME + timedelta(days=60)).date(),
+        "active",
+    )
+    return create_concert(
+        db_session, tour, venue, day_offset=day_offset, ticket_price="80.00",
+        base_time=REFERENCE_TIME, tickets_sold=venue.capacity,
+    )
+
+
+class TestSoldOutConcertsEndpoint:
     """Coverage for `GET /api/v1/concerts/sold-out`."""
 
-    def test_no_concerts_returns_empty_list(self, client):
-        response = client.get("/api/v1/concerts/sold-out")
-        assert response.status_code == 200
-        assert response.json() == []
-
-    def test_no_sold_out_concerts_returns_empty_list_not_404(self, client, db_session):
-        venues = create_venues(db_session, count=1)
-        tour = create_tour(
-            db_session, "Farewell Tour", "Test Artist",
-            REFERENCE_TIME.date(),
-            (REFERENCE_TIME + timedelta(days=30)).date(),
-            "active",
-        )
-        create_concert(
-            db_session, tour, venues[0], day_offset=5, ticket_price="80.00", base_time=REFERENCE_TIME,
-            tickets_sold=venues[0].capacity - 1,
-        )
-
-        response = client.get("/api/v1/concerts/sold-out")
-        assert response.status_code == 200
-        assert response.json() == []
-
-    def test_returns_sold_out_concerts_soonest_first(self, client, db_session):
-        venues = create_venues(db_session, count=2)
-        tour = create_tour(
-            db_session, "Scramble Tour", "Test Artist",
-            REFERENCE_TIME.date(),
-            (REFERENCE_TIME + timedelta(days=30)).date(),
-            "active",
-        )
-        later = create_concert(
-            db_session, tour, venues[0], day_offset=20, ticket_price="80.00", base_time=REFERENCE_TIME,
-            tickets_sold=venues[0].capacity,
-        )
-        soonest = create_concert(
-            db_session, tour, venues[1], day_offset=1, ticket_price="80.00", base_time=REFERENCE_TIME,
-            tickets_sold=venues[1].capacity,
-        )
-
-        response = client.get("/api/v1/concerts/sold-out")
-        assert response.status_code == 200
-        payload = response.json()
-
-        assert [c["id"] for c in payload] == [soonest.id, later.id]
-        assert all(c["sold_out"] is True and c["is_sold_out"] is True for c in payload)
-
-    def test_cancelled_sold_out_concert_is_excluded(self, client, db_session):
-        venues = create_venues(db_session, count=1)
-        tour = create_tour(
-            db_session, "Cancelled Tour", "Test Artist",
-            REFERENCE_TIME.date(),
-            (REFERENCE_TIME + timedelta(days=30)).date(),
-            "active",
-        )
-        create_concert(
-            db_session, tour, venues[0], day_offset=5, ticket_price="80.00", base_time=REFERENCE_TIME,
-            tickets_sold=venues[0].capacity, is_cancelled=True, cancellation_reason="Venue closed",
-        )
-
-        response = client.get("/api/v1/concerts/sold-out")
-        assert response.status_code == 200
-        assert response.json() == []
-
-    def test_past_sold_out_concert_is_excluded(self, client, db_session):
-        venues = create_venues(db_session, count=1)
-        tour = create_tour(
-            db_session, "Farewell Tour", "Test Artist",
-            (REFERENCE_TIME - timedelta(days=30)).date(),
-            (REFERENCE_TIME + timedelta(days=1)).date(),
-            "active",
-        )
-        create_concert(
-            db_session, tour, venues[0], day_offset=-1, ticket_price="80.00", base_time=REFERENCE_TIME,
-            tickets_sold=venues[0].capacity,
-        )
-
-        response = client.get("/api/v1/concerts/sold-out")
-        assert response.status_code == 200
-        assert response.json() == []
-
-    def test_response_matches_concert_response_schema(self, client, db_session):
+    def test_sold_out_returns_200_and_payload_shape(self, client, db_session):
         venues = create_venues(db_session, count=1)
         tour = create_tour(
             db_session, "Loaded Tour", "Test Artist",
@@ -132,14 +66,83 @@ class TestSoldOutConcerts:
         payload = response.json()[0]
 
         assert payload["id"] == concert.id
-        assert set(payload.keys()) == {
-            "id", "tour_id", "venue_id", "venue_name", "venue_city", "date_time",
-            "days_until_concert", "ticket_price", "tickets_sold", "remaining_tickets",
-            "sold_out", "is_sold_out", "is_almost_sold_out", "is_cancelled",
-            "cancellation_reason", "notes",
+        assert payload["title"] == tour.name
+        assert payload["start_datetime"] == concert.date_time.isoformat()
+        assert payload["venue"] == {
+            "id": venues[0].id, "name": venues[0].name, "city": venues[0].city,
         }
+        assert payload["capacity"] == venues[0].capacity
+        assert payload["tickets_sold"] == venues[0].capacity
+        assert payload["tickets_remaining"] == 0
 
-    def test_sold_out_route_not_swallowed_by_concert_id_route(self, client):
+    def test_sold_out_ordered_soonest_first(self, client, db_session):
+        venues = create_venues(db_session, count=2)
+        later = _make_sold_out_concert(db_session, "Scramble Tour", day_offset=20, venue=venues[0])
+        soonest = _make_sold_out_concert(db_session, "Scramble Tour", day_offset=1, venue=venues[1])
+
+        response = client.get("/api/v1/concerts/sold-out")
+        assert response.status_code == 200
+        payload = response.json()
+
+        assert [c["id"] for c in payload] == [soonest.id, later.id]
+
+    def test_sold_out_excludes_cancelled_concerts(self, client, db_session):
+        venues = create_venues(db_session, count=1)
+        tour = create_tour(
+            db_session, "Cancelled Tour", "Test Artist",
+            REFERENCE_TIME.date(),
+            (REFERENCE_TIME + timedelta(days=30)).date(),
+            "active",
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=5, ticket_price="80.00", base_time=REFERENCE_TIME,
+            tickets_sold=venues[0].capacity, is_cancelled=True, cancellation_reason="Venue closed",
+        )
+
+        response = client.get("/api/v1/concerts/sold-out")
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_sold_out_excludes_past_concerts(self, client, db_session):
+        venues = create_venues(db_session, count=1)
+        tour = create_tour(
+            db_session, "Farewell Tour", "Test Artist",
+            (REFERENCE_TIME - timedelta(days=30)).date(),
+            (REFERENCE_TIME + timedelta(days=1)).date(),
+            "active",
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=-1, ticket_price="80.00", base_time=REFERENCE_TIME,
+            tickets_sold=venues[0].capacity,
+        )
+
+        response = client.get("/api/v1/concerts/sold-out")
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_sold_out_excludes_concerts_with_tickets_left(self, client, db_session):
+        venues = create_venues(db_session, count=1)
+        tour = create_tour(
+            db_session, "Farewell Tour", "Test Artist",
+            REFERENCE_TIME.date(),
+            (REFERENCE_TIME + timedelta(days=30)).date(),
+            "active",
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=5, ticket_price="80.00", base_time=REFERENCE_TIME,
+            tickets_sold=venues[0].capacity - 1,
+        )
+
+        response = client.get("/api/v1/concerts/sold-out")
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_sold_out_returns_200_empty_list_when_none(self, client):
+        response = client.get("/api/v1/concerts/sold-out")
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_sold_out_route_not_shadowed_by_concert_detail_route(self, client):
         """`/sold-out` must resolve to this endpoint, not `GET /{concert_id}`
         with `concert_id="sold-out"` (which would 422 on the int path param)."""
         response = client.get("/api/v1/concerts/sold-out")

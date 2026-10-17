@@ -32,6 +32,7 @@ from ..schemas import (
     NextConcertVenue,
     OccupancyResponse,
     RefundRequest,
+    SoldOutConcertRead,
     TicketPriceUpdate,
     TicketPurchaseRequest,
 )
@@ -300,7 +301,7 @@ def export_concerts_csv(db: Session = Depends(get_db)):
     )
 
 
-@api_router.get("/sold-out", response_model=List[ConcertResponse])
+@api_router.get("/sold-out", response_model=List[SoldOutConcertRead], status_code=200)
 def get_sold_out_concerts_endpoint(
     db: Session = Depends(get_db),
     reference_time: datetime = Depends(get_reference_time),
