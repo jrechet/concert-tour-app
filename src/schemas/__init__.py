@@ -29,6 +29,8 @@ from .concert import (
     ConcertNextResponse,
     NextConcertVenue,
     NextConcertCity,
+    SoldOutConcertRead,
+    SoldOutConcertVenue,
     TicketPriceUpdate,
 )
 from .venue import VenueCreate, VenueResponse
