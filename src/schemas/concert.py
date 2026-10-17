@@ -4,7 +4,7 @@ Pydantic schemas for Concert entities.
 
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field, root_validator, validator
+from pydantic import AliasPath, BaseModel, ConfigDict, Field, field_validator, root_validator, validator
 from decimal import Decimal
 
 
@@ -286,3 +286,43 @@ class ConcertResponse(BaseModel):
                 "notes": None
             }
         }
+
+
+class SoldOutConcertVenue(BaseModel):
+    """Minimal venue summary embedded in `SoldOutConcertRead`."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = Field(..., description="Unique venue identifier")
+    name: str = Field(..., description="Venue name")
+    city: str = Field(..., description="City the venue is located in")
+
+
+class SoldOutConcertRead(BaseModel):
+    """Schema for a single entry in the sold-out concerts listing.
+
+    `title` is sourced from the concert's parent tour, since `Concert`
+    itself has no title field. `capacity` is the hosting venue's capacity.
+    `tickets_remaining` is forced to 0 regardless of the value derived from
+    the ORM object, since every concert in this listing is sold out by
+    definition.
+    """
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: int = Field(..., description="Unique concert identifier")
+    title: str = Field(
+        ..., validation_alias=AliasPath("tour", "name"), description="Title of the tour this concert belongs to"
+    )
+    start_datetime: datetime = Field(..., validation_alias="date_time", description="Concert date and time")
+    venue: SoldOutConcertVenue = Field(..., description="Venue hosting this concert")
+    capacity: int = Field(..., validation_alias=AliasPath("venue", "capacity"), description="Venue capacity")
+    tickets_sold: int = Field(..., description="Number of tickets sold")
+    tickets_remaining: int = Field(..., description="Tickets remaining; always 0 for this sold-out listing")
+
+    @field_validator("tickets_remaining", mode="before")
+    @classmethod
+    def force_tickets_remaining_to_zero(cls, v):
+        """Ignore whatever value is supplied; this listing only ever
+        contains sold-out concerts, so remaining tickets is always 0."""
+        return 0
