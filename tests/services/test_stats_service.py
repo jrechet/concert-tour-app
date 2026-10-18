@@ -1,11 +1,12 @@
-"""Unit tests for `get_concerts_per_weekday`, `get_revenue_by_city`, and
-`get_capacity_stats`."""
+"""Unit tests for `get_concerts_per_weekday`, `get_revenue_by_city`,
+`get_capacity_stats`, and `count_concerts_per_month`."""
 
 from datetime import datetime, timedelta
 
-from src.schemas.stats import CapacityStats
+from src.schemas.stats import CapacityStats, MonthlyConcertCount
 from src.services.stats_service import (
     CityRevenue,
+    count_concerts_per_month,
     get_capacity_stats,
     get_concerts_per_weekday,
     get_revenue_by_city,
@@ -332,3 +333,94 @@ class TestGetCapacityStats:
         assert result.total_capacity == venues[0].capacity
         assert result.tickets_sold == venues[0].capacity + 250
         assert result.seats_left == 0
+
+
+class TestCountConcertsPerMonth:
+    """Coverage for `count_concerts_per_month`."""
+
+    def test_empty_database_returns_empty_list(self, db_session):
+        assert count_concerts_per_month(db_session) == []
+
+    def test_concerts_in_same_month_are_aggregated(self, db_session):
+        venues = create_venues(db_session, count=2)
+        tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=0, ticket_price="80.00",
+            base_time=BASE_TIME,
+        )
+        create_concert(
+            db_session, tour, venues[1], day_offset=5, ticket_price="90.00",
+            base_time=BASE_TIME,
+        )
+
+        result = count_concerts_per_month(db_session)
+
+        assert result == [MonthlyConcertCount(month="2024-06", count=2)]
+
+    def test_cancelled_concerts_excluded_and_cancelled_only_month_omitted(self, db_session):
+        venues = create_venues(db_session, count=2)
+        tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=0, ticket_price="80.00",
+            base_time=BASE_TIME,
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=1, ticket_price="80.00",
+            base_time=BASE_TIME, is_cancelled=True, cancellation_reason="Artist illness",
+        )
+        # Entirely-cancelled next month must be absent, not zero.
+        create_concert(
+            db_session, tour, venues[1], day_offset=32, ticket_price="90.00",
+            base_time=BASE_TIME, is_cancelled=True, cancellation_reason="Venue unavailable",
+        )
+
+        result = count_concerts_per_month(db_session)
+
+        assert result == [MonthlyConcertCount(month="2024-06", count=1)]
+
+    def test_results_sorted_chronologically_across_year_boundary(self, db_session):
+        venues = create_venues(db_session, count=3)
+        tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        base_time = datetime(2025, 11, 10)
+        create_concert(
+            db_session, tour, venues[0], day_offset=0, ticket_price="80.00",
+            base_time=base_time,
+        )  # 2025-11
+        create_concert(
+            db_session, tour, venues[1], day_offset=30, ticket_price="80.00",
+            base_time=base_time,
+        )  # 2025-12
+        create_concert(
+            db_session, tour, venues[2], day_offset=60, ticket_price="80.00",
+            base_time=base_time,
+        )  # 2026-01
+
+        result = count_concerts_per_month(db_session)
+
+        assert [entry.month for entry in result] == ["2025-11", "2025-12", "2026-01"]
+        assert all(entry.count == 1 for entry in result)
+
+    def test_result_items_are_monthly_concert_count_instances(self, db_session):
+        venues = create_venues(db_session, count=1)
+        tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=0, ticket_price="80.00",
+            base_time=BASE_TIME,
+        )
+
+        result = count_concerts_per_month(db_session)
+
+        assert len(result) == 1
+        assert isinstance(result[0], MonthlyConcertCount)
