@@ -5,7 +5,7 @@ Unit tests for WeekdayStatsResponse Pydantic schema.
 import pytest
 from pydantic import ValidationError
 
-from src.schemas.stats import CapacityStats, WeekdayStatsResponse
+from src.schemas.stats import CapacityStats, MonthlyConcertCount, WeekdayStatsResponse
 
 
 WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
@@ -71,3 +71,20 @@ def test_capacity_stats_serializes_expected_keys():
     stats = CapacityStats(total_capacity=1000, tickets_sold=250, seats_left=750)
     dumped = stats.model_dump()
     assert set(dumped.keys()) == {"total_capacity", "tickets_sold", "seats_left"}
+
+
+class TestMonthlyConcertCount:
+    """Test cases for the `MonthlyConcertCount` schema's `month` pattern."""
+
+    def test_valid_month_is_accepted(self):
+        item = MonthlyConcertCount(month="2026-01", count=7)
+        assert item.month == "2026-01"
+        assert item.count == 7
+
+    @pytest.mark.parametrize(
+        "month",
+        ["2026-13", "202-01", "2026-1", "2026/01", "2026-00", "not-a-month"],
+    )
+    def test_malformed_month_raises(self, month):
+        with pytest.raises(ValidationError):
+            MonthlyConcertCount(month=month, count=1)

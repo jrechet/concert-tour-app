@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_reference_time
 from ..models import Concert, Venue
-from ..schemas.stats import CapacityStats, PriceStatsResponse
+from ..schemas.stats import CapacityStats, MonthlyConcertCount, PriceStatsResponse
 
 _WEEKDAY_NAMES = [
     "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
@@ -92,6 +92,30 @@ def get_concert_counts_by_month(db: Session) -> List[Tuple[str, int]]:
         .all()
     )
     return [(row[0], row[1]) for row in rows]
+
+
+def count_concerts_per_month(db: Session) -> List[MonthlyConcertCount]:
+    """Return `MonthlyConcertCount` entries for non-cancelled concerts,
+    grouped by calendar year/month and ordered chronologically ascending.
+
+    Grouping is done via `func.extract('year'/'month', ...)` (rather than
+    `strftime`/`to_char`) so the query runs unchanged against both SQLite
+    and PostgreSQL. A month with no non-cancelled concerts is absent from
+    the result, rather than appearing with a count of 0.
+    """
+    year = func.extract("year", Concert.date_time)
+    month = func.extract("month", Concert.date_time)
+    rows = (
+        db.query(year.label("year"), month.label("month"), func.count(Concert.id))
+        .filter(Concert.is_cancelled.is_(False))
+        .group_by(year, month)
+        .order_by(year, month)
+        .all()
+    )
+    return [
+        MonthlyConcertCount(month=f"{int(row_year):04d}-{int(row_month):02d}", count=count)
+        for row_year, row_month, count in rows
+    ]
 
 
 def get_distinct_venue_names(db: Session) -> List[str]:

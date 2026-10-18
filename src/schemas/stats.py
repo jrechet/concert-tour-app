@@ -101,7 +101,11 @@ class CountryConcertCountResponse(BaseModel):
 class MonthlyConcertCount(BaseModel):
     """Number of concerts hosted during a single calendar month."""
 
-    month: str = Field(..., description="Calendar month in 'YYYY-MM' format")
+    month: str = Field(
+        ...,
+        pattern=r"^\d{4}-(0[1-9]|1[0-2])$",
+        description="Calendar month in 'YYYY-MM' format",
+    )
     count: int = Field(..., description="Number of concerts in this month")
 
     class Config:

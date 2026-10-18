@@ -191,6 +191,7 @@ class TestUpcomingConcerts:
             "ticket_price",
             "tickets_sold",
             "remaining_tickets",
+            "tickets_remaining",
             "sold_out",
             "is_sold_out",
             "is_almost_sold_out",
