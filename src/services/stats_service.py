@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_reference_time
 from ..models import Concert, Venue
-from ..schemas.stats import CapacityStats, MonthlyConcertCount, PriceStatsResponse
+from ..schemas.stats import CapacityStats, MonthlyConcertCount, PriceStats
 
 _WEEKDAY_NAMES = [
     "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
@@ -153,7 +153,7 @@ def get_concerts_per_weekday(db: Session) -> "OrderedDict[str, int]":
     return counts
 
 
-def get_price_stats(db: Session) -> PriceStatsResponse:
+def get_price_stats(db: Session) -> PriceStats:
     """Compute ticket price statistics over upcoming, non-cancelled concerts
     with a known price.
 
@@ -180,11 +180,11 @@ def get_price_stats(db: Session) -> PriceStatsResponse:
     )
     count, lowest, average, highest = row
     if not count:
-        return PriceStatsResponse(lowest=None, average=None, highest=None)
-    return PriceStatsResponse(
-        lowest=float(lowest),
-        average=float(average),
-        highest=float(highest),
+        return PriceStats(min=None, avg=None, max=None)
+    return PriceStats(
+        min=float(lowest),
+        avg=float(average),
+        max=float(highest),
     )
 
 

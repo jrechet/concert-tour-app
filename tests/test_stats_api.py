@@ -158,14 +158,14 @@ def test_get_prices_returns_lowest_average_highest_for_eligible_concerts(client,
     response = client.get("/api/v1/stats/prices")
 
     assert response.status_code == 200
-    assert response.json() == {"lowest": 50.0, "average": 100.0, "highest": 150.0}
+    assert response.json() == {"min": 50.0, "avg": 100.0, "max": 150.0}
 
 
 def test_get_prices_returns_nulls_when_no_eligible_concerts(client, db_session):
     response = client.get("/api/v1/stats/prices")
 
     assert response.status_code == 200
-    assert response.json() == {"lowest": None, "average": None, "highest": None}
+    assert response.json() == {"min": None, "avg": None, "max": None}
 
 
 def test_stats_endpoints_documented_in_openapi_schema(client):
@@ -187,5 +187,5 @@ def test_stats_endpoints_documented_in_openapi_schema(client):
 
     prices_get = schema["paths"]["/api/v1/stats/prices"]["get"]
     assert prices_get["responses"]["200"]["content"]["application/json"]["schema"]["$ref"] == (
-        "#/components/schemas/PriceStatsResponse"
+        "#/components/schemas/PriceStats"
     )

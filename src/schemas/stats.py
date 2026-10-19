@@ -139,29 +139,6 @@ class MonthlyConcertCountResponse(BaseModel):
         }
 
 
-class PriceStatsResponse(BaseModel):
-    """Schema wrapping ticket price statistics over upcoming, non-cancelled
-    concerts with a known price.
-
-    All three fields are `None` when there are no eligible concerts, rather
-    than 0, since 0 would misleadingly imply a real price of zero.
-    """
-
-    lowest: Optional[float] = Field(..., description="Lowest ticket price, or null if no eligible concerts")
-    average: Optional[float] = Field(..., description="Average ticket price, or null if no eligible concerts")
-    highest: Optional[float] = Field(..., description="Highest ticket price, or null if no eligible concerts")
-
-    class Config:
-        """Pydantic configuration."""
-        schema_extra = {
-            "example": {
-                "lowest": 45.0,
-                "average": 87.5,
-                "highest": 150.0,
-            }
-        }
-
-
 class PriceStats(BaseModel):
     """Minimal ticket price summary schema exposing `min`/`avg`/`max`.
 
