@@ -209,9 +209,9 @@ def test_get_concert_counts_by_month_returns_empty_list_when_no_concerts(db_sess
 def test_get_price_stats_returns_none_triple_when_no_concerts(db_session):
     result = get_price_stats(db_session)
 
-    assert result.lowest is None
-    assert result.average is None
-    assert result.highest is None
+    assert result.min is None
+    assert result.avg is None
+    assert result.max is None
 
 
 def test_get_price_stats_computes_min_avg_max_over_upcoming_priced_concerts(db_session):
@@ -224,9 +224,9 @@ def test_get_price_stats_computes_min_avg_max_over_upcoming_priced_concerts(db_s
 
     result = get_price_stats(db_session)
 
-    assert result.lowest == 50.0
-    assert result.average == 100.0
-    assert result.highest == 150.0
+    assert result.min == 50.0
+    assert result.avg == 100.0
+    assert result.max == 150.0
 
 
 def test_get_price_stats_excludes_cancelled_concerts(db_session):
@@ -241,9 +241,9 @@ def test_get_price_stats_excludes_cancelled_concerts(db_session):
 
     result = get_price_stats(db_session)
 
-    assert result.lowest == 50.0
-    assert result.average == 50.0
-    assert result.highest == 50.0
+    assert result.min == 50.0
+    assert result.avg == 50.0
+    assert result.max == 50.0
 
 
 def test_get_price_stats_excludes_past_concerts(db_session):
@@ -255,9 +255,9 @@ def test_get_price_stats_excludes_past_concerts(db_session):
 
     result = get_price_stats(db_session)
 
-    assert result.lowest == 50.0
-    assert result.average == 50.0
-    assert result.highest == 50.0
+    assert result.min == 50.0
+    assert result.avg == 50.0
+    assert result.max == 50.0
 
 
 def test_get_price_stats_excludes_concerts_with_no_price(db_session):
@@ -269,9 +269,9 @@ def test_get_price_stats_excludes_concerts_with_no_price(db_session):
 
     result = get_price_stats(db_session)
 
-    assert result.lowest == 75.0
-    assert result.average == 75.0
-    assert result.highest == 75.0
+    assert result.min == 75.0
+    assert result.avg == 75.0
+    assert result.max == 75.0
 
 
 def test_get_price_stats_returns_none_triple_when_only_ineligible_concerts(db_session):
@@ -287,6 +287,6 @@ def test_get_price_stats_returns_none_triple_when_only_ineligible_concerts(db_se
 
     result = get_price_stats(db_session)
 
-    assert result.lowest is None
-    assert result.average is None
-    assert result.highest is None
+    assert result.min is None
+    assert result.avg is None
+    assert result.max is None
