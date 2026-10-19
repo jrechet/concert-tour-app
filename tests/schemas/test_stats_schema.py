@@ -5,7 +5,13 @@ Unit tests for WeekdayStatsResponse Pydantic schema.
 import pytest
 from pydantic import ValidationError
 
-from src.schemas.stats import CapacityStats, MonthlyConcertCount, WeekdayStatsResponse
+from src.schemas.stats import (
+    CapacityStats,
+    MonthlyConcertCount,
+    PRICE_STATS_DECIMALS,
+    PriceStats,
+    WeekdayStatsResponse,
+)
 
 
 WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
@@ -88,3 +94,26 @@ class TestMonthlyConcertCount:
     def test_malformed_month_raises(self, month):
         with pytest.raises(ValidationError):
             MonthlyConcertCount(month=month, count=1)
+
+
+class TestPriceStats:
+    """Test cases for the `PriceStats` schema."""
+
+    def test_all_values_populated_round_trips(self):
+        stats = PriceStats(min=10.0, avg=20.0, max=30.0)
+        assert stats.model_dump() == {"min": 10.0, "avg": 20.0, "max": 30.0}
+
+    def test_defaults_to_all_null(self):
+        stats = PriceStats()
+        assert stats.model_dump() == {"min": None, "avg": None, "max": None}
+
+    @pytest.mark.parametrize("field", ["min", "avg", "max"])
+    def test_non_numeric_value_raises(self, field):
+        payload = {"min": 10.0, "avg": 20.0, "max": 30.0}
+        payload[field] = "not-a-number"
+        with pytest.raises(ValidationError):
+            PriceStats(**payload)
+
+    def test_avg_is_rounded_to_configured_precision(self):
+        stats = PriceStats(min=10.0, avg=20.12345, max=30.0)
+        assert stats.avg == round(20.12345, PRICE_STATS_DECIMALS)
