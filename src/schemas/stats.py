@@ -4,7 +4,9 @@ Pydantic schemas for stats API responses.
 
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+PRICE_STATS_DECIMALS = 2
 
 
 class CitiesResponse(BaseModel):
@@ -156,6 +158,37 @@ class PriceStatsResponse(BaseModel):
                 "lowest": 45.0,
                 "average": 87.5,
                 "highest": 150.0,
+            }
+        }
+
+
+class PriceStats(BaseModel):
+    """Minimal ticket price summary schema exposing `min`/`avg`/`max`.
+
+    All three fields default to `None` so an empty result set can be
+    represented without a sentinel value like 0, which would misleadingly
+    imply a real price of zero.
+    """
+
+    min: Optional[float] = Field(default=None, description="Lowest ticket price, or null if no eligible concerts")
+    avg: Optional[float] = Field(default=None, description="Average ticket price, or null if no eligible concerts")
+    max: Optional[float] = Field(default=None, description="Highest ticket price, or null if no eligible concerts")
+
+    @field_validator("avg")
+    @classmethod
+    def round_avg(cls, value: Optional[float]) -> Optional[float]:
+        """Round `avg` to `PRICE_STATS_DECIMALS` decimal places."""
+        if value is None:
+            return value
+        return round(value, PRICE_STATS_DECIMALS)
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "min": 45.0,
+                "avg": 87.5,
+                "max": 150.0,
             }
         }
 
