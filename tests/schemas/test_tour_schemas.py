@@ -2,6 +2,8 @@
 Unit tests for CancelTour Pydantic schemas.
 """
 
+from datetime import date
+
 import pytest
 from pydantic import ValidationError
 
@@ -11,6 +13,7 @@ from src.schemas.tour import (
     TourCancelRequest,
     TourCancelResponse,
     TourCitiesResponse,
+    TourCityOut,
 )
 
 
@@ -82,9 +85,15 @@ class TestTourCitiesResponse:
     """Test cases for TourCitiesResponse schema."""
 
     def test_valid_payload(self):
-        response = TourCitiesResponse(tour_id=1, cities=["New York", "London"])
+        response = TourCitiesResponse(
+            tour_id=1,
+            cities=[
+                {"city": "New York", "first_concert_date": "2024-06-01"},
+                {"city": "London", "first_concert_date": "2024-06-05"},
+            ],
+        )
         assert response.tour_id == 1
-        assert response.cities == ["New York", "London"]
+        assert [c.city for c in response.cities] == ["New York", "London"]
 
     def test_empty_cities_list_is_valid(self):
         response = TourCitiesResponse(tour_id=1, cities=[])
@@ -92,8 +101,32 @@ class TestTourCitiesResponse:
 
     def test_missing_tour_id_raises(self):
         with pytest.raises(ValidationError):
-            TourCitiesResponse(cities=["New York"])
+            TourCitiesResponse(cities=[{"city": "New York", "first_concert_date": "2024-06-01"}])
 
     def test_missing_cities_raises(self):
         with pytest.raises(ValidationError):
             TourCitiesResponse(tour_id=1)
+
+
+class TestTourCityOut:
+    """Test cases for the `TourCityOut` schema."""
+
+    def test_tour_city_out_from_orm_row(self):
+        """Builds from an ORM-like row/tuple object exposing `city` and
+        `first_concert_date` attributes, via `from_attributes`."""
+
+        class Row:
+            city = "New York"
+            first_concert_date = date(2024, 6, 1)
+
+        city_out = TourCityOut.model_validate(Row())
+        assert city_out.city == "New York"
+        assert city_out.first_concert_date == date(2024, 6, 1)
+
+    def test_tour_cities_response_serializes_empty_list(self):
+        response = TourCitiesResponse(tour_id=1, cities=[])
+        assert response.model_dump() == {"tour_id": 1, "cities": []}
+
+    def test_tour_city_out_rejects_missing_city(self):
+        with pytest.raises(ValidationError):
+            TourCityOut(first_concert_date="2024-06-01")
