@@ -1,6 +1,6 @@
 """Tests for `GET /api/v1/tours/{tour_id}/cities`."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from tests.fixtures.dashboard_fixtures import create_concert, create_tour, create_venues
 
@@ -32,7 +32,11 @@ class TestTourCitiesEndpoint:
         assert data["tour_id"] == tour.id
         # New York (0), London (1), New York again (dup, skipped), Paris (3);
         # the cancelled concert's venue does not add a second Paris entry.
-        assert data["cities"] == ["New York", "London", "Paris"]
+        assert data["cities"] == [
+            {"city": "New York", "first_concert_date": str(BASE_TIME.date())},
+            {"city": "London", "first_concert_date": str((BASE_TIME + timedelta(days=1)).date())},
+            {"city": "Paris", "first_concert_date": str((BASE_TIME + timedelta(days=3)).date())},
+        ]
 
     def test_cancelled_only_concert_excludes_its_city_entirely(self, client, db_session):
         venues = create_venues(db_session, count=2)
@@ -50,7 +54,9 @@ class TestTourCitiesEndpoint:
         assert response.status_code == 200
         data = response.json()
         # London's only concert was cancelled, so it never appears at all.
-        assert data["cities"] == ["New York"]
+        assert data["cities"] == [
+            {"city": "New York", "first_concert_date": str(BASE_TIME.date())},
+        ]
 
     def test_cities_for_tour_with_no_concerts(self, client, empty_tour):
         tour = empty_tour["tour"]

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_reference_time
 from ..models import Concert, Tour, Venue
-from ..schemas.tour import TourStatus
+from ..schemas.tour import TourCityOut, TourStatus
 
 # Not a `TourStatus` member: that enum is reserved for the statuses accepted
 # by `GET /tours`'s `status` query filter, and "cancelled" isn't one of them
@@ -65,32 +65,31 @@ def get_tour_revenue(db: Session, tour_id: int) -> Optional[TourRevenue]:
     return TourRevenue(revenue=Decimal(revenue_total), concert_count=concert_count)
 
 
-def get_tour_cities(db: Session, tour_id: int) -> Optional[List[str]]:
-    """Return the distinct cities a tour passes through, in date order.
+def get_tour_cities(db: Session, tour_id: int) -> Optional[List[TourCityOut]]:
+    """Return the distinct cities a tour passes through, in date order,
+    each paired with the date of its earliest non-cancelled concert.
 
     Cancelled concerts are excluded. When a city is visited more than once,
-    only its first occurrence (by concert date) determines its position.
-    Returns `None` when no tour with `tour_id` exists, so the router can
-    translate that into a 404.
+    its earliest concert date determines both its position and its
+    `first_concert_date`. Returns `None` when no tour with `tour_id`
+    exists, so the router can translate that into a 404.
     """
     if db.query(Tour.id).filter(Tour.id == tour_id).first() is None:
         return None
 
-    cities = (
-        db.query(Venue.city)
+    rows = (
+        db.query(Venue.city, func.min(Concert.date_time))
         .join(Concert, Concert.venue_id == Venue.id)
         .filter(Concert.tour_id == tour_id, Concert.is_cancelled.is_(False))
-        .order_by(Concert.date_time)
+        .group_by(Venue.city)
+        .order_by(func.min(Concert.date_time))
         .all()
     )
 
-    seen = set()
-    distinct_cities = []
-    for (city,) in cities:
-        if city not in seen:
-            seen.add(city)
-            distinct_cities.append(city)
-    return distinct_cities
+    return [
+        TourCityOut(city=city, first_concert_date=first_date_time.date())
+        for city, first_date_time in rows
+    ]
 
 
 def get_tour_span(tour_id: int, db: Session) -> TourSpan:

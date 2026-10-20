@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal
 from enum import Enum
 from typing import List, Optional
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, validator
 
 
 TOUR_CANCEL_REASON_MAX_LENGTH = 500
@@ -127,21 +127,26 @@ class TourSummary(BaseModel):
         }
 
 
+class TourCityOut(BaseModel):
+    """A single city visited by a tour, with its earliest non-cancelled
+    concert date so API consumers can verify the ordering of `cities` in
+    `TourCitiesResponse` themselves."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    city: str = Field(..., description="City name")
+    first_concert_date: date = Field(
+        ..., description="Date of the tour's earliest non-cancelled concert in this city"
+    )
+
+
 class TourCitiesResponse(BaseModel):
     """Schema for the tour cities API response."""
 
-    tour_id: int = Field(..., description="Unique tour identifier")
-    cities: List[str] = Field(..., description="Distinct cities visited, in date order")
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        """Pydantic configuration."""
-        orm_mode = True
-        schema_extra = {
-            "example": {
-                "tour_id": 1,
-                "cities": ["New York", "London", "Paris"]
-            }
-        }
+    tour_id: int = Field(..., description="Unique tour identifier")
+    cities: List[TourCityOut] = Field(..., description="Distinct cities visited, in date order")
 
 
 class CancelTourRequest(BaseModel):

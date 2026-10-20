@@ -86,7 +86,10 @@ class TestGetTourCities:
 
         result = get_tour_cities(db_session, tour.id)
 
-        assert result == [venues[0].city, venues[1].city]
+        assert [(c.city, c.first_concert_date) for c in result] == [
+            (venues[0].city, BASE_TIME.date()),
+            (venues[1].city, BASE_TIME.date() + timedelta(days=1)),
+        ]
 
     def test_tour_with_zero_concerts_returns_empty_list(self, db_session):
         tour = create_tour(
