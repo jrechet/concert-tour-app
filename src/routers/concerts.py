@@ -22,7 +22,7 @@ from ..schemas import (
     ConcertNextResponse,
     ConcertNotesUpdate,
     ConcertPriceFilter,
-    ConcertRescheduleRequest,
+    ConcertReschedule,
     ConcertResponse,
     LineupEntryCreate,
     LineupEntryOut,
@@ -370,22 +370,31 @@ def get_concert(concert_id: int, db: Session = Depends(get_db)):
             "content": {"application/json": {"example": {"detail": "Concert 1 is cancelled"}}},
         },
         422: {
-            "description": "The requested `date_time` is not in the future.",
+            "description": "The requested `date_time` is not in the future, or the body is missing/malformed.",
             "content": {
                 "application/json": {
-                    "example": {"detail": "new_date_time 2024-01-01 00:00:00 must be in the future"}
+                    "example": {
+                        "detail": [
+                            {
+                                "loc": ["body", "date_time"],
+                                "msg": "Value error, date_time must be strictly in the future",
+                                "type": "value_error",
+                            }
+                        ]
+                    }
                 }
             },
         },
     },
 )
 def reschedule_concert_endpoint(
-    concert_id: int, payload: ConcertRescheduleRequest, db: Session = Depends(get_db)
+    concert_id: int, payload: ConcertReschedule, db: Session = Depends(get_db)
 ):
     """Reschedule a concert to a new `date_time`.
 
     Returns 404 for an unknown concert, 409 if the concert has been
-    cancelled, and 422 if the new `date_time` is not in the future.
+    cancelled, and 422 if the new `date_time` is not in the future (rejected
+    by `ConcertReschedule` itself, so this route never duplicates that check).
     """
     try:
         return reschedule_concert(db, concert_id, payload.date_time)
