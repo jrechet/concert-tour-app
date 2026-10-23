@@ -2,10 +2,15 @@
 Pydantic schemas for Concert entities.
 """
 
-from datetime import datetime
+import os
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from pydantic import AliasPath, BaseModel, ConfigDict, Field, field_validator, root_validator, validator
 from decimal import Decimal
+
+RESCHEDULE_CLOCK_SKEW_TOLERANCE_SECONDS = float(
+    os.getenv("CONCERT_RESCHEDULE_CLOCK_SKEW_TOLERANCE_SECONDS", "0")
+)
 
 
 class ConcertCreate(BaseModel):
@@ -125,6 +130,38 @@ class ConcertRescheduleRequest(BaseModel):
                 "date_time": "2024-08-01T20:00:00",
             }
         }
+
+
+class ConcertReschedule(BaseModel):
+    """Schema for the request body of `PATCH /api/v1/concerts/{id}`.
+
+    Rejects a `date_time` that is not strictly in the future so FastAPI
+    returns a 422 before the route handler is ever reached.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"example": {"date_time": "2024-08-01T20:00:00+00:00"}},
+    )
+
+    date_time: datetime = Field(..., description="New concert date and time")
+
+    @field_validator("date_time")
+    @classmethod
+    def validate_future_date_time(cls, v: datetime) -> datetime:
+        """Normalise naive input to UTC and reject anything not strictly
+        in the future, allowing for a configurable clock-skew tolerance."""
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        else:
+            v = v.astimezone(timezone.utc)
+
+        earliest_acceptable = datetime.now(timezone.utc) - timedelta(
+            seconds=RESCHEDULE_CLOCK_SKEW_TOLERANCE_SECONDS
+        )
+        if v <= earliest_acceptable:
+            raise ValueError("date_time must be strictly in the future")
+        return v
 
 
 class ConcertNotesUpdate(BaseModel):
