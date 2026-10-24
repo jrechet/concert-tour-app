@@ -249,6 +249,17 @@ class TourSpanResponse(BaseModel):
         }
 
 
+class TourSpanRead(BaseModel):
+    """Schema for the tour span API response, with all fields nullable so
+    an empty tour (no concerts) can be represented."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    first_concert_date: Optional[date] = Field(None, description="Earliest non-cancelled concert date")
+    last_concert_date: Optional[date] = Field(None, description="Latest non-cancelled concert date")
+    duration_days: Optional[int] = Field(None, description="Number of calendar days between first_concert_date and last_concert_date")
+
+
 class TourOccupancyResponse(BaseModel):
     """Schema for the tour occupancy API response."""
 
