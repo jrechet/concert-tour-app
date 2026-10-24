@@ -17,7 +17,7 @@ from ..schemas import (
     TourUpdate,
     TourOccupancyResponse,
     TourResponse,
-    TourSpanResponse,
+    TourSpanRead,
     TourStatus,
     TourSummary,
     TourRevenue,
@@ -164,7 +164,7 @@ def get_tour_summary(tour_id: int, db: Session = Depends(get_db)):
     )
 
 
-@router.get("/{tour_id}/span", response_model=TourSpanResponse)
+@router.get("/{tour_id}/span", response_model=TourSpanRead)
 def get_tour_span_endpoint(tour_id: int, db: Session = Depends(get_db)):
     """Retrieve a tour's date span, derived from its non-cancelled concerts.
 
@@ -175,10 +175,10 @@ def get_tour_span_endpoint(tour_id: int, db: Session = Depends(get_db)):
         span = get_tour_span(tour_id, db)
     except TourNotFoundError:
         raise HTTPException(status_code=404, detail="Tour not found")
-    return TourSpanResponse(
-        first_date=span.first_date,
-        last_date=span.last_date,
-        days_between=span.days_between,
+    return TourSpanRead(
+        first_concert_date=span.first_date,
+        last_concert_date=span.last_date,
+        duration_days=span.days_between,
     )
 
 
