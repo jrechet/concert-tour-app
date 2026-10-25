@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, validator
 
 
 TOUR_CANCEL_REASON_MAX_LENGTH = 500
+OCCUPANCY_PERCENTAGE_PRECISION = 2
 
 
 class TourStatus(str, Enum):
@@ -272,6 +273,30 @@ class TourOccupancyResponse(BaseModel):
         orm_mode = True
         schema_extra = {
             "example": {
+                "tickets_sold": 24000,
+                "total_capacity": 30000,
+                "percentage_sold": 80.0,
+            }
+        }
+
+
+class TourOccupancySchema(BaseModel):
+    """Schema for the tour occupancy API response."""
+
+    tour_id: int = Field(..., description="Unique tour identifier")
+    tickets_sold: int = Field(..., description="Tickets sold across the tour's non-cancelled concerts")
+    total_capacity: int = Field(..., description="Total venue capacity across the tour's non-cancelled concerts")
+    percentage_sold: float = Field(
+        ...,
+        description=f"Tickets sold as a percentage of total capacity, rounded to {OCCUPANCY_PERCENTAGE_PRECISION} decimal places",
+    )
+
+    class Config:
+        """Pydantic configuration."""
+        orm_mode = True
+        schema_extra = {
+            "example": {
+                "tour_id": 1,
                 "tickets_sold": 24000,
                 "total_capacity": 30000,
                 "percentage_sold": 80.0,
