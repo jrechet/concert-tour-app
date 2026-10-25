@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_reference_time
 from ..models import Concert, Tour, Venue
-from ..schemas.tour import TourCityOut, TourStatus
+from ..schemas.tour import OCCUPANCY_PERCENTAGE_PRECISION, TourCityOut, TourOccupancySchema, TourStatus
 
 # Not a `TourStatus` member: that enum is reserved for the statuses accepted
 # by `GET /tours`'s `status` query filter, and "cancelled" isn't one of them
@@ -118,6 +118,49 @@ def get_tour_span(tour_id: int, db: Session) -> TourSpan:
         first_date=first_date,
         last_date=last_date,
         days_between=(last_date - first_date).days,
+    )
+
+
+def get_tour_occupancy(db: Session, tour_id: int) -> Optional[TourOccupancySchema]:
+    """Compute ticket occupancy for a tour, aggregated over its non-cancelled
+    concerts.
+
+    `tickets_sold` and `total_capacity` are summed from `Concert.tickets_sold`
+    and the linked `Venue.capacity` across the tour's non-cancelled concerts;
+    cancelled concerts are excluded from both sums. `percentage_sold` is
+    `tickets_sold / total_capacity * 100`, rounded to
+    `OCCUPANCY_PERCENTAGE_PRECISION` decimal places, and is `0.0` (rather
+    than raising `ZeroDivisionError`) when `total_capacity` is 0, e.g.
+    because the tour has no concerts or only cancelled ones. Returns `None`
+    when no tour with `tour_id` exists, so the router can translate that
+    into a 404.
+    """
+    if db.query(Tour.id).filter(Tour.id == tour_id).first() is None:
+        return None
+
+    tickets_sold, total_capacity = (
+        db.query(
+            func.coalesce(func.sum(Concert.tickets_sold), 0),
+            func.coalesce(func.sum(Venue.capacity), 0),
+        )
+        .join(Venue, Concert.venue_id == Venue.id)
+        .filter(Concert.tour_id == tour_id, Concert.is_cancelled.is_(False))
+        .first()
+    )
+    tickets_sold = int(tickets_sold)
+    total_capacity = int(total_capacity)
+
+    percentage_sold = (
+        round(tickets_sold / total_capacity * 100, OCCUPANCY_PERCENTAGE_PRECISION)
+        if total_capacity > 0
+        else 0.0
+    )
+
+    return TourOccupancySchema(
+        tour_id=tour_id,
+        tickets_sold=tickets_sold,
+        total_capacity=total_capacity,
+        percentage_sold=percentage_sold,
     )
 
 
