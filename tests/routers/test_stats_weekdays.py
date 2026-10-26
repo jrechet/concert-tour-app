@@ -83,3 +83,8 @@ class TestWeekdayStatsEndpoint:
         counts = _counts_by_weekday(response.json())
         assert "Sunday" in counts
         assert counts["Sunday"] == 0
+
+    def test_post_weekdays_returns_405(self, client):
+        response = client.post("/api/v1/stats/weekdays")
+
+        assert response.status_code == 405
