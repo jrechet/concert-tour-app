@@ -19,6 +19,8 @@ from ..schemas import (
     PriceStats,
     UpcomingCountResponse,
     VenuesResponse,
+    WEEKDAY_NAMES,
+    WeekdayCount,
     WeekdayStatsResponse,
 )
 from ..services.stats_service import (
@@ -148,11 +150,5 @@ def get_weekdays_stats(db: Session = Depends(get_db)):
     """
     counts = get_concerts_per_weekday(db)
     return WeekdayStatsResponse(
-        monday=counts["Monday"],
-        tuesday=counts["Tuesday"],
-        wednesday=counts["Wednesday"],
-        thursday=counts["Thursday"],
-        friday=counts["Friday"],
-        saturday=counts["Saturday"],
-        sunday=counts["Sunday"],
+        weekdays=[WeekdayCount(weekday=name, count=counts[name]) for name in WEEKDAY_NAMES]
     )

@@ -16,11 +16,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_reference_time
 from ..models import Concert, Venue
-from ..schemas.stats import CapacityStats, MonthlyConcertCount, PriceStats
-
-_WEEKDAY_NAMES = [
-    "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
-]
+from ..schemas.stats import CapacityStats, MonthlyConcertCount, PriceStats, WEEKDAY_NAMES
 
 
 def get_distinct_cities(db: Session) -> List[str]:
@@ -142,14 +138,14 @@ def get_concerts_per_weekday(db: Session) -> "OrderedDict[str, int]":
     a SQL `GROUP BY`) since `date_time.isoweekday()` behaves the same
     regardless of the underlying database dialect.
     """
-    counts = OrderedDict((name, 0) for name in _WEEKDAY_NAMES)
+    counts = OrderedDict((name, 0) for name in WEEKDAY_NAMES)
     rows = (
         db.query(Concert.date_time)
         .filter(Concert.is_cancelled.is_(False))
         .all()
     )
     for (date_time,) in rows:
-        counts[_WEEKDAY_NAMES[date_time.isoweekday() - 1]] += 1
+        counts[WEEKDAY_NAMES[date_time.isoweekday() - 1]] += 1
     return counts
 
 
