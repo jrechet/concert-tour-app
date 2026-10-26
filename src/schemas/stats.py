@@ -8,6 +8,10 @@ from pydantic import BaseModel, Field, field_validator
 
 PRICE_STATS_DECIMALS = 2
 
+WEEKDAY_NAMES: List[str] = [
+    "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+]
+
 
 class CitiesResponse(BaseModel):
     """Schema wrapping the distinct list of cities hosting at least one concert."""
@@ -204,27 +208,43 @@ class CapacityStats(BaseModel):
         }
 
 
-class WeekdayStatsResponse(BaseModel):
-    """Schema wrapping the number of concerts held on each day of the week."""
+class WeekdayCount(BaseModel):
+    """Number of concerts held on a single weekday."""
 
-    monday: int = Field(..., ge=0, description="Number of concerts held on Mondays")
-    tuesday: int = Field(..., ge=0, description="Number of concerts held on Tuesdays")
-    wednesday: int = Field(..., ge=0, description="Number of concerts held on Wednesdays")
-    thursday: int = Field(..., ge=0, description="Number of concerts held on Thursdays")
-    friday: int = Field(..., ge=0, description="Number of concerts held on Fridays")
-    saturday: int = Field(..., ge=0, description="Number of concerts held on Saturdays")
-    sunday: int = Field(..., ge=0, description="Number of concerts held on Sundays")
+    weekday: str = Field(..., description="Canonical English weekday name, e.g. 'Monday'")
+    count: int = Field(..., ge=0, description="Number of concerts held on this weekday")
 
     class Config:
         """Pydantic configuration."""
         schema_extra = {
             "example": {
-                "monday": 3,
-                "tuesday": 1,
-                "wednesday": 2,
-                "thursday": 4,
-                "friday": 6,
-                "saturday": 8,
-                "sunday": 5,
+                "weekday": "Monday",
+                "count": 3,
+            }
+        }
+
+
+class WeekdayStatsResponse(BaseModel):
+    """Schema wrapping the number of concerts held on each day of the week,
+    ordered Monday through Sunday."""
+
+    weekdays: List[WeekdayCount] = Field(
+        ..., description="Concert counts for each weekday, ordered Monday through Sunday"
+    )
+
+    @field_validator("weekdays")
+    @classmethod
+    def validate_weekdays(cls, value: List[WeekdayCount]) -> List[WeekdayCount]:
+        """Require exactly the 7 `WEEKDAY_NAMES`, in that order."""
+        names = [entry.weekday for entry in value]
+        if names != WEEKDAY_NAMES:
+            raise ValueError(f"weekdays must be exactly {WEEKDAY_NAMES}, in order; got {names}")
+        return value
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "weekdays": [{"weekday": name, "count": 0} for name in WEEKDAY_NAMES]
             }
         }

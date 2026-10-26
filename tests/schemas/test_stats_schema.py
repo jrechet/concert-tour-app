@@ -10,45 +10,53 @@ from src.schemas.stats import (
     MonthlyConcertCount,
     PRICE_STATS_DECIMALS,
     PriceStats,
+    WEEKDAY_NAMES,
+    WeekdayCount,
     WeekdayStatsResponse,
 )
 
 
-WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+class TestWeekdayCount:
+    """Test cases for the `WeekdayCount` schema."""
+
+    def test_zero_count_is_valid(self):
+        item = WeekdayCount(weekday="Monday", count=0)
+        assert item.count == 0
+
+    def test_negative_count_raises(self):
+        with pytest.raises(ValidationError):
+            WeekdayCount(weekday="Monday", count=-1)
+
+
+class TestWeekdayNames:
+    """Test cases for the `WEEKDAY_NAMES` constant."""
+
+    def test_has_seven_entries_monday_to_sunday(self):
+        assert len(WEEKDAY_NAMES) == 7
+        assert WEEKDAY_NAMES[0] == "Monday"
+        assert WEEKDAY_NAMES[-1] == "Sunday"
 
 
 class TestWeekdayStatsResponse:
-    """Test cases for WeekdayStatsResponse schema."""
+    """Test cases for the `WeekdayStatsResponse` schema."""
 
-    def test_valid_payload_round_trips(self):
-        payload = {
-            "monday": 1,
-            "tuesday": 2,
-            "wednesday": 3,
-            "thursday": 4,
-            "friday": 5,
-            "saturday": 6,
-            "sunday": 0,
+    def test_valid_payload_serializes_and_preserves_order(self):
+        weekdays = [WeekdayCount(weekday=name, count=index) for index, name in enumerate(WEEKDAY_NAMES)]
+        response = WeekdayStatsResponse(weekdays=weekdays)
+        dumped = response.model_dump()
+        assert dumped == {
+            "weekdays": [{"weekday": name, "count": index} for index, name in enumerate(WEEKDAY_NAMES)]
         }
-        response = WeekdayStatsResponse(**payload)
-        assert response.model_dump() == payload
 
-    @pytest.mark.parametrize("weekday", WEEKDAYS)
-    def test_negative_value_raises(self, weekday):
-        payload = {day: 1 for day in WEEKDAYS}
-        payload[weekday] = -1
+    def test_out_of_order_weekdays_raises(self):
+        weekdays = [WeekdayCount(weekday=name, count=0) for name in reversed(WEEKDAY_NAMES)]
         with pytest.raises(ValidationError):
-            WeekdayStatsResponse(**payload)
+            WeekdayStatsResponse(weekdays=weekdays)
 
-    @pytest.mark.parametrize("weekday", WEEKDAYS)
-    def test_missing_field_raises(self, weekday):
-        payload = {day: 1 for day in WEEKDAYS}
-        del payload[weekday]
+    def test_wrong_number_of_weekdays_raises(self):
+        weekdays = [WeekdayCount(weekday=name, count=0) for name in WEEKDAY_NAMES[:6]]
         with pytest.raises(ValidationError):
-            WeekdayStatsResponse(**payload)
-
-    def test_field_order_is_monday_to_sunday(self):
-        assert list(WeekdayStatsResponse.model_fields.keys()) == WEEKDAYS
+            WeekdayStatsResponse(weekdays=weekdays)
 
 
 def test_capacity_stats_accepts_positive_values():
