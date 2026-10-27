@@ -3,6 +3,7 @@
 from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import ValidationError
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session, joinedload, selectinload
 
@@ -16,7 +17,9 @@ from ..schemas import (
     TourCreate,
     TourUpdate,
     TourOccupancyResponse,
+    TourRead,
     TourResponse,
+    TourSearchQuery,
     TourSpanRead,
     TourStatus,
     TourSummary,
@@ -72,10 +75,20 @@ def get_tours(
     return tours
 
 
-@router.get("/search", response_model=List[TourResponse])
-def search_tours_by_artist_endpoint(artist: str = Query(...), db: Session = Depends(get_db)):
-    """Search tours whose artist contains the given text, case-insensitively."""
-    return search_tours_by_artist(db, artist)
+@router.get("/search", response_model=List[TourRead])
+def search_tours_by_artist_endpoint(
+    artist: str = Query(..., min_length=1, description="Artist name to search tours by"),
+    db: Session = Depends(get_db),
+):
+    """Search tours whose artist contains the given text, case-insensitively
+    and by substring. Returns 200 with an empty list when nothing matches
+    (never 404).
+    """
+    try:
+        query = TourSearchQuery(artist=artist)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors())
+    return search_tours_by_artist(db, query.artist)
 
 
 @router.get("/sold-out", response_model=List[TourResponse])
