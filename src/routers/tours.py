@@ -33,7 +33,7 @@ from ..services.tour_service import (
     get_tour_cities,
     get_tour_revenue,
     get_tour_span,
-    search_by_artist,
+    search_tours_by_artist,
     uncancel_tour,
 )
 
@@ -73,9 +73,9 @@ def get_tours(
 
 
 @router.get("/search", response_model=List[TourResponse])
-def search_tours_by_artist(artist: str = Query(...), db: Session = Depends(get_db)):
+def search_tours_by_artist_endpoint(artist: str = Query(...), db: Session = Depends(get_db)):
     """Search tours whose artist contains the given text, case-insensitively."""
-    return search_by_artist(db, artist)
+    return search_tours_by_artist(db, artist)
 
 
 @router.get("/sold-out", response_model=List[TourResponse])

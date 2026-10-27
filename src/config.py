@@ -24,3 +24,6 @@ DEMO_ENABLED = os.environ.get("DEMO_ENABLED", "false").strip().lower() in ("1", 
 # Debounce delay, in milliseconds, before the concert list's city search box
 # fires its HTMX request after the user stops typing.
 CITY_SEARCH_DEBOUNCE_MS = int(os.environ.get("CITY_SEARCH_DEBOUNCE_MS", "300"))
+
+# Upper bound on the number of tours returned by the artist search.
+MAX_ARTIST_SEARCH_RESULTS = int(os.environ.get("MAX_ARTIST_SEARCH_RESULTS", "50"))
