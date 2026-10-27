@@ -7,6 +7,7 @@ from typing import List, NamedTuple, Optional
 from sqlalchemy import and_, case, func
 from sqlalchemy.orm import Session
 
+from ..config import MAX_ARTIST_SEARCH_RESULTS
 from ..database import get_reference_time
 from ..models import Concert, Tour, Venue
 from ..schemas.tour import OCCUPANCY_PERCENTAGE_PRECISION, TourCityOut, TourOccupancySchema, TourStatus
@@ -300,16 +301,31 @@ def get_sold_out_tours(db: Session) -> List[Tour]:
     return db.query(Tour).filter(Tour.id.in_(qualifying_tour_ids)).all()
 
 
-def search_by_artist(db: Session, artist: str) -> List[Tour]:
-    """Return all tours whose `artist` contains `artist`, case-insensitively.
+def _escape_like_wildcards(value: str) -> str:
+    """Escape `\\`, `%`, and `_` so they're matched literally in a `LIKE`/
+    `ILIKE` pattern instead of acting as wildcards."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
-    Returns an empty list when `artist` is empty or matches nothing.
+
+def search_tours_by_artist(
+    db: Session, artist: str, limit: int = MAX_ARTIST_SEARCH_RESULTS
+) -> List[Tour]:
+    """Return tours whose `artist` contains `artist`, case-insensitively.
+
+    The match is a substring search (`%artist%`); `%` and `_` in `artist`
+    are escaped so they're matched literally rather than acting as `LIKE`
+    wildcards. Results are ordered by `artist`, then `id`, for a
+    deterministic order, and capped at `limit`. Returns an empty list when
+    `artist` is empty or matches nothing.
     """
     if not artist:
         return []
 
+    pattern = f"%{_escape_like_wildcards(artist)}%"
     return (
         db.query(Tour)
-        .filter(func.lower(Tour.artist).contains(artist.lower()))
+        .filter(Tour.artist.ilike(pattern, escape="\\"))
+        .order_by(Tour.artist, Tour.id)
+        .limit(limit)
         .all()
     )

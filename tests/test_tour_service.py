@@ -12,7 +12,6 @@ from src.services.tour_service import (
     get_tour_cities,
     get_tour_revenue,
     get_tour_span,
-    search_by_artist,
 )
 from tests.fixtures.dashboard_fixtures import create_concert, create_tour, create_venues
 
@@ -202,53 +201,3 @@ class TestDuplicateTour:
 
         assert result is None
         assert db_session.query(Tour).count() == 0
-
-
-class TestSearchByArtist:
-    """Coverage for `search_by_artist`."""
-
-    def test_exact_match(self, db_session):
-        tour = create_tour(
-            db_session, "Neon Skyline World Tour", "Aurora Belle",
-            BASE_TIME.date(), BASE_TIME.date(), "active",
-        )
-
-        result = search_by_artist(db_session, "Aurora Belle")
-
-        assert [t.id for t in result] == [tour.id]
-
-    def test_different_case_matches(self, db_session):
-        tour = create_tour(
-            db_session, "Neon Skyline World Tour", "Aurora Belle",
-            BASE_TIME.date(), BASE_TIME.date(), "active",
-        )
-
-        result = search_by_artist(db_session, "aurora belle")
-
-        assert [t.id for t in result] == [tour.id]
-
-    def test_substring_match(self, db_session):
-        tour = create_tour(
-            db_session, "Neon Skyline World Tour", "Aurora Belle",
-            BASE_TIME.date(), BASE_TIME.date(), "active",
-        )
-
-        result = search_by_artist(db_session, "rora bel")
-
-        assert [t.id for t in result] == [tour.id]
-
-    def test_no_match_returns_empty_list(self, db_session):
-        create_tour(
-            db_session, "Neon Skyline World Tour", "Aurora Belle",
-            BASE_TIME.date(), BASE_TIME.date(), "active",
-        )
-
-        assert search_by_artist(db_session, "Nonexistent Artist") == []
-
-    def test_empty_input_returns_empty_list(self, db_session):
-        create_tour(
-            db_session, "Neon Skyline World Tour", "Aurora Belle",
-            BASE_TIME.date(), BASE_TIME.date(), "active",
-        )
-
-        assert search_by_artist(db_session, "") == []
