@@ -105,6 +105,34 @@ class TourResponse(BaseModel):
         }
 
 
+class TourSearchQuery(BaseModel):
+    """Query parameters accepted by `GET /api/v1/tours/search`."""
+
+    artist: str = Field(..., min_length=1, description="Artist name to search tours by")
+
+    @validator('artist')
+    def validate_artist_not_blank(cls, v):
+        """Reject an artist value that is only whitespace, and trim
+        surrounding whitespace from valid ones."""
+        trimmed = v.strip()
+        if not trimmed:
+            raise ValueError('artist must not be blank')
+        return trimmed
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "artist": "queen"
+            }
+        }
+
+
+# Reuse the existing tour read schema as the item type for search results,
+# rather than duplicating its shape.
+TourRead = TourResponse
+
+
 class TourSummary(BaseModel):
     """Schema for the tour summary API response."""
 
