@@ -25,6 +25,18 @@ class VenueCreate(BaseModel):
         return v
 
 
+class VenueRead(BaseModel):
+    """Schema for reading a venue, serialized from an ORM instance."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = Field(..., description="Unique venue identifier")
+    name: str = Field(..., description="Venue name")
+    city: str = Field(..., description="City the venue is located in")
+    country: str = Field(..., description="Country the venue is located in")
+    capacity: int = Field(..., description="Venue capacity")
+
+
 class VenueResponse(BaseModel):
     """Schema for venue API responses, including the database id."""
 
