@@ -3,9 +3,9 @@ Pydantic schemas for Concert entities.
 """
 
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
-from pydantic import AliasPath, BaseModel, ConfigDict, Field, field_validator, root_validator, validator
+from pydantic import AliasPath, BaseModel, ConfigDict, Field, field_validator, model_validator, root_validator, validator
 from decimal import Decimal
 
 RESCHEDULE_CLOCK_SKEW_TOLERANCE_SECONDS = float(
@@ -200,6 +200,26 @@ class ConcertPriceFilter(BaseModel):
         if min_price is not None and max_price is not None and min_price > max_price:
             raise ValueError("min_price must not be greater than max_price")
         return values
+
+
+class ConcertDateRangeQuery(BaseModel):
+    """Query-parameter validation for the `start`/`end` date range on
+    `GET /api/v1/concerts/between`.
+
+    Cross-field validation (rejecting `start > end`) happens here, at the
+    validation layer, so FastAPI reports it as a standard 422 validation
+    error and the router stays thin.
+    """
+
+    start: date = Field(..., description="Start of the date range (YYYY-MM-DD), inclusive")
+    end: date = Field(..., description="End of the date range (YYYY-MM-DD), inclusive")
+
+    @model_validator(mode="after")
+    def validate_date_range(self) -> "ConcertDateRangeQuery":
+        """Reject a `start` that falls after `end`."""
+        if self.start > self.end:
+            raise ValueError("start must be on or before end")
+        return self
 
 
 class NextConcertVenue(BaseModel):
