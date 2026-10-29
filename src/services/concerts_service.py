@@ -131,15 +131,16 @@ def get_concerts_between_dates(db: Session, start: date, end: date) -> List[Conc
 
     Both bounds are inclusive and compared against `Concert.date_time`'s
     calendar date (not exact timestamp), mirroring `is_past`/`get_upcoming_concerts`.
-    Ordered soonest first, by date ascending. Returns an empty list when no
-    concert falls in range.
+    Ordered soonest first, by date ascending, with `id` as a stable
+    tie-breaker for concerts sharing the same `date_time`. Returns an empty
+    list when no concert falls in range.
     """
     return (
         db.query(Concert)
         .options(joinedload(Concert.venue))
         .filter(func.date(Concert.date_time) >= start)
         .filter(func.date(Concert.date_time) <= end)
-        .order_by(Concert.date_time)
+        .order_by(Concert.date_time, Concert.id)
         .all()
     )
 
