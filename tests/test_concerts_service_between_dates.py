@@ -70,6 +70,52 @@ class TestGetConcertsBetweenDates:
 
         assert results == []
 
+    def test_concert_one_day_before_start_is_excluded(self, db_session):
+        venues = create_venues(db_session, count=1)
+        tour = create_tour(
+            db_session, "Day Before Tour", "Test Artist",
+            (BASE_TIME - timedelta(days=5)).date(),
+            (BASE_TIME + timedelta(days=5)).date(),
+            "active",
+        )
+        create_concert(db_session, tour, venues[0], day_offset=-1, ticket_price="80.00", base_time=BASE_TIME)
+        start = BASE_TIME.date()
+        end = (BASE_TIME + timedelta(days=5)).date()
+
+        assert get_concerts_between_dates(db_session, start, end) == []
+
+    def test_concert_one_day_after_end_is_excluded(self, db_session):
+        venues = create_venues(db_session, count=1)
+        tour = create_tour(
+            db_session, "Day After Tour", "Test Artist",
+            (BASE_TIME - timedelta(days=5)).date(),
+            (BASE_TIME + timedelta(days=5)).date(),
+            "active",
+        )
+        create_concert(db_session, tour, venues[0], day_offset=6, ticket_price="80.00", base_time=BASE_TIME)
+        start = BASE_TIME.date()
+        end = (BASE_TIME + timedelta(days=5)).date()
+
+        assert get_concerts_between_dates(db_session, start, end) == []
+
+    def test_start_equals_end_returns_only_that_days_concerts(self, db_session):
+        venues = create_venues(db_session, count=2)
+        tour = create_tour(
+            db_session, "Single Day Tour", "Test Artist",
+            (BASE_TIME - timedelta(days=5)).date(),
+            (BASE_TIME + timedelta(days=5)).date(),
+            "active",
+        )
+        on_date = create_concert(
+            db_session, tour, venues[0], day_offset=0, ticket_price="80.00", base_time=BASE_TIME
+        )
+        create_concert(db_session, tour, venues[1], day_offset=1, ticket_price="80.00", base_time=BASE_TIME)
+        day = BASE_TIME.date()
+
+        results = get_concerts_between_dates(db_session, day, day)
+
+        assert [c.id for c in results] == [on_date.id]
+
     def test_results_are_ordered_ascending_by_date(self, db_session):
         venues = create_venues(db_session, count=3)
         tour = create_tour(
@@ -88,3 +134,20 @@ class TestGetConcertsBetweenDates:
         results = get_concerts_between_dates(db_session, start, end)
 
         assert [c.id for c in results] == [earliest.id, middle.id, later.id]
+
+    def test_concerts_sharing_a_date_time_are_ordered_by_id(self, db_session):
+        venues = create_venues(db_session, count=2)
+        tour = create_tour(
+            db_session, "Tie Tour", "Test Artist",
+            (BASE_TIME - timedelta(days=5)).date(),
+            (BASE_TIME + timedelta(days=5)).date(),
+            "active",
+        )
+        first = create_concert(db_session, tour, venues[0], day_offset=0, ticket_price="80.00", base_time=BASE_TIME)
+        second = create_concert(db_session, tour, venues[1], day_offset=0, ticket_price="80.00", base_time=BASE_TIME)
+        start = BASE_TIME.date()
+        end = BASE_TIME.date()
+
+        results = get_concerts_between_dates(db_session, start, end)
+
+        assert [c.id for c in results] == [first.id, second.id]
