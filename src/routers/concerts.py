@@ -19,6 +19,7 @@ from ..database import get_db, get_reference_time
 from ..models import Concert, LineupEntry, Tour, Venue
 from ..schemas import (
     CancelConcertRequest,
+    ConcertDateRangeQuery,
     ConcertNextResponse,
     ConcertNotesUpdate,
     ConcertPriceFilter,
@@ -99,6 +100,27 @@ def get_price_filter(
     """
     try:
         return ConcertPriceFilter(min_price=min_price, max_price=max_price)
+    except ValidationError as exc:
+        raise RequestValidationError(
+            [{**error, "loc": ("query", *error["loc"])} for error in exc.errors()]
+        )
+
+
+def get_date_range_query(
+    start: date = Query(..., description="Start of the date range (YYYY-MM-DD), inclusive"),
+    end: date = Query(..., description="End of the date range (YYYY-MM-DD), inclusive"),
+) -> ConcertDateRangeQuery:
+    """Validate and bundle the `start`/`end` query params for `GET /between`.
+
+    Runs as a FastAPI dependency, ahead of the endpoint body. `start`/`end`
+    are parsed as `date` by FastAPI itself (missing or malformed values are
+    rejected with a 422 before this dependency even runs); the cross-field
+    `start <= end` check happens in `ConcertDateRangeQuery`, whose
+    `ValidationError` is translated here into FastAPI's own
+    `RequestValidationError` so it still surfaces as a 422 rather than a 500.
+    """
+    try:
+        return ConcertDateRangeQuery(start=start, end=end)
     except ValidationError as exc:
         raise RequestValidationError(
             [{**error, "loc": ("query", *error["loc"])} for error in exc.errors()]
@@ -326,21 +348,18 @@ def get_sold_out_concerts_endpoint(
     },
 )
 def get_concerts_between(
-    start: date = Query(..., description="Start of the date range (YYYY-MM-DD), inclusive"),
-    end: date = Query(..., description="End of the date range (YYYY-MM-DD), inclusive"),
+    date_range: ConcertDateRangeQuery = Depends(get_date_range_query),
     db: Session = Depends(get_db),
 ):
     """Retrieve concerts whose date falls within `start`/`end`, inclusive, soonest first.
 
     Registered ahead of `/{concert_id}` so the literal `between` path segment
-    isn't swallowed as a concert ID. `start` and `end` are required `date`
-    query parameters, so a missing or malformed value is rejected with a 422
-    by FastAPI itself; a `start` after `end` is rejected with an explicit 422
-    here.
+    isn't swallowed as a concert ID. `start` and `end` are validated by
+    `ConcertDateRangeQuery` (required, parseable dates, `start` not after
+    `end`), surfacing any violation as a 422; ordering and the inclusive
+    bounds themselves are delegated entirely to `get_concerts_between_dates`.
     """
-    if start > end:
-        raise HTTPException(status_code=422, detail="start must not be after end")
-    return get_concerts_between_dates(db, start, end)
+    return get_concerts_between_dates(db, date_range.start, date_range.end)
 
 
 @api_router.get("/{concert_id}", response_model=ConcertResponse)
