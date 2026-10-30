@@ -16,6 +16,10 @@ class InvalidSetOrderError(Exception):
     positive integer."""
 
 
+MIN_SET_ORDER = 1
+"""Lowest valid `set_order` position; `move_lineup_entry` clamps to this floor."""
+
+
 def delete_lineup_entry(db: Session, concert_id: int, entry_id: int) -> None:
     """Remove a supporting act from a concert's lineup.
 
@@ -97,9 +101,27 @@ def reorder_lineup_entry(db: Session, concert_id: int, entry_id: int, new_set_or
             f"Lineup entry {entry_id} not found for concert {concert_id}"
         )
 
-    old_set_order = entry.set_order
-    if new_set_order == old_set_order:
+    if new_set_order == entry.set_order:
         return entry
+
+    return _resequence(db, concert_id, entry, new_set_order)
+
+
+def _resequence(db: Session, concert_id: int, entry: LineupEntry, new_set_order: int) -> LineupEntry:
+    """Move `entry` (already confirmed to belong to `concert_id`) to
+    `new_set_order`, shifting sibling entries to keep `set_order` contiguous.
+
+    Moving to a later position shifts every entry strictly between the old
+    and new position down by one; moving to an earlier position shifts
+    every entry strictly between the new and old position up by one. The
+    moved entry is parked at an unused sentinel `set_order` while siblings
+    are shifted (and each shift is flushed immediately), since `LineupEntry`
+    enforces a `(concert_id, set_order)` uniqueness rule on every flush and
+    shifting in place would otherwise momentarily collide with either the
+    entry's own old slot or a sibling's not-yet-shifted slot. On success,
+    commits and returns the updated entry.
+    """
+    old_set_order = entry.set_order
 
     siblings = (
         db.query(LineupEntry)
@@ -133,3 +155,46 @@ def reorder_lineup_entry(db: Session, concert_id: int, entry_id: int, new_set_or
     db.commit()
     db.refresh(entry)
     return entry
+
+
+def move_lineup_entry(db: Session, concert_id: int, entry_id: int, set_order: int) -> LineupEntry:
+    """Move a lineup entry to `set_order`, resequencing siblings so the
+    concert's `set_order` values stay a contiguous `1..n` run.
+
+    Raises `ConcertNotFoundError` when no concert with `concert_id` exists.
+    Raises `LineupEntryNotFoundError` when no lineup entry with `entry_id`
+    exists, or when it exists but belongs to a different concert (checked
+    via the real `LineupEntry.concert_id` foreign key) — both cases collapse
+    onto the same error so a caller can never learn that an entry exists on
+    another concert.
+
+    `set_order` is clamped to the valid `[MIN_SET_ORDER, n]` range, where
+    `n` is the concert's total lineup entry count: requesting a position at
+    or beyond the end of the lineup moves the entry to the last slot (`n`)
+    rather than leaving a gap above it, and the schema layer already
+    rejects non-positive values before they reach this function, so the
+    floor clamp only guards direct callers that bypass the schema. Moving
+    an entry to its current (post-clamp) position is a no-op. On success,
+    commits and returns the moved entry.
+    """
+    concert_exists = db.query(Concert.id).filter(Concert.id == concert_id).first()
+    if not concert_exists:
+        raise ConcertNotFoundError(f"Concert {concert_id} not found")
+
+    entry = (
+        db.query(LineupEntry)
+        .filter(LineupEntry.id == entry_id, LineupEntry.concert_id == concert_id)
+        .first()
+    )
+    if entry is None:
+        raise LineupEntryNotFoundError(
+            f"Lineup entry {entry_id} not found for concert {concert_id}"
+        )
+
+    entry_count = db.query(LineupEntry).filter(LineupEntry.concert_id == concert_id).count()
+    clamped_set_order = max(MIN_SET_ORDER, min(set_order, entry_count))
+
+    if clamped_set_order == entry.set_order:
+        return entry
+
+    return _resequence(db, concert_id, entry, clamped_set_order)
