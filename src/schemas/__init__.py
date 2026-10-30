@@ -42,7 +42,13 @@ from .concert import (
 )
 from .venue import VenueCreate, VenueResponse
 from .lineup_entry import LineupEntryResponse
-from .lineup import LineupEntryCreate, LineupEntryOut, LineupReorderRequest
+from .lineup import (
+    LineupEntryCreate,
+    LineupEntryMove,
+    LineupEntryOut,
+    LineupEntryRead,
+    LineupReorderRequest,
+)
 from .lineup_act import LineupActCreate, LineupActRead
 from .occupancy import OccupancyResponse
 from .ticket import RefundRequest, TicketPurchaseRequest
@@ -100,7 +106,9 @@ __all__ = [
     "TicketPriceUpdate",
     "LineupEntryResponse",
     "LineupEntryCreate",
+    "LineupEntryMove",
     "LineupEntryOut",
+    "LineupEntryRead",
     "LineupReorderRequest",
     "LineupActCreate",
     "LineupActRead",

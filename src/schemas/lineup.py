@@ -1,10 +1,10 @@
 """
-Pydantic schemas for creating and returning LineupEntry records.
+Pydantic schemas for creating, moving, and returning LineupEntry records.
 """
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, validator
 
 
 class LineupEntryCreate(BaseModel):
@@ -32,10 +32,10 @@ class LineupEntryCreate(BaseModel):
         }
 
 
-class LineupReorderRequest(BaseModel):
+class LineupEntryMove(BaseModel):
     """Schema for moving a lineup entry to a new running-order position."""
 
-    set_order: int = Field(..., ge=1, description="New running order position (1 plays first)")
+    set_order: int = Field(..., gt=0, description="New running order position (1 plays first)")
 
     class Config:
         """Pydantic configuration."""
@@ -46,19 +46,17 @@ class LineupReorderRequest(BaseModel):
         }
 
 
-class LineupEntryOut(BaseModel):
-    """Schema for lineup entry API responses."""
+# Backward-compatible alias: `LineupReorderRequest` was the original name for
+# this schema before it was formalized as `LineupEntryMove`.
+LineupReorderRequest = LineupEntryMove
 
-    id: int = Field(..., description="Unique lineup entry identifier")
-    concert_id: int = Field(..., description="ID of the concert this entry belongs to")
-    artist_name: str = Field(..., description="Name of the performing act")
-    set_order: int = Field(..., description="Running order position (1 plays first)")
-    created_at: datetime = Field(..., description="When this lineup entry was created")
 
-    class Config:
-        """Pydantic configuration."""
-        orm_mode = True
-        schema_extra = {
+class LineupEntryRead(BaseModel):
+    """Schema for lineup entry API responses, e.g. after creating or moving one."""
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
             "example": {
                 "id": 1,
                 "concert_id": 1,
@@ -66,4 +64,16 @@ class LineupEntryOut(BaseModel):
                 "set_order": 1,
                 "created_at": "2026-09-29T00:00:00",
             }
-        }
+        },
+    )
+
+    id: int = Field(..., description="Unique lineup entry identifier")
+    concert_id: int = Field(..., description="ID of the concert this entry belongs to")
+    artist_name: str = Field(..., description="Name of the performing act")
+    set_order: int = Field(..., description="Running order position (1 plays first)")
+    created_at: datetime = Field(..., description="When this lineup entry was created")
+
+
+# Backward-compatible alias: `LineupEntryOut` was the original name for this
+# schema before it was formalized as `LineupEntryRead`.
+LineupEntryOut = LineupEntryRead
