@@ -12,6 +12,8 @@ RESCHEDULE_CLOCK_SKEW_TOLERANCE_SECONDS = float(
     os.getenv("CONCERT_RESCHEDULE_CLOCK_SKEW_TOLERANCE_SECONDS", "0")
 )
 
+MAX_NOTES_LENGTH = 500
+
 
 class ConcertCreate(BaseModel):
     """Schema for creating a new concert."""
@@ -168,7 +170,7 @@ class ConcertNotesUpdate(BaseModel):
     """Schema for the request body of the update-concert-notes endpoint."""
 
     notes: str = Field(
-        ..., max_length=500, description="Free-text notes about this concert"
+        ..., max_length=MAX_NOTES_LENGTH, description="Free-text notes about this concert"
     )
 
     class Config:
@@ -316,7 +318,7 @@ class ConcertResponse(BaseModel):
         None, description="Free-text reason for cancellation; null when the concert is not cancelled"
     )
     notes: Optional[str] = Field(
-        None, max_length=500, description="Free-text notes about this concert; null when none have been added"
+        None, max_length=MAX_NOTES_LENGTH, description="Free-text notes about this concert; null when none have been added"
     )
 
     class Config:
