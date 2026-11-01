@@ -47,9 +47,11 @@ class TestRevenueByCityEndpoint:
 
         assert response.status_code == 200
         data = response.json()
-        assert [entry["city"] for entry in data] == ["New York", "Paris", "London"]
-        assert [entry["revenue"] for entry in data] == [5000.0, 1500.0, 200.0]
-        assert all(isinstance(entry["revenue"], (int, float)) for entry in data)
+        assert data == [
+            {"city": "New York", "revenue": 5000.0},
+            {"city": "Paris", "revenue": 1500.0},
+            {"city": "London", "revenue": 200.0},
+        ]
 
     def test_cancelled_concert_revenue_not_counted(self, client, db_session):
         tour = _seed_tour(db_session)
@@ -71,3 +73,24 @@ class TestRevenueByCityEndpoint:
         assert len(data) == 1
         assert data[0]["city"] == venues[0].city
         assert data[0]["revenue"] == 800.0
+
+    def test_city_with_only_priceless_concerts_has_zero_revenue(self, client, db_session):
+        tour = _seed_tour(db_session)
+        venues = create_venues(db_session, count=1)
+        create_concert(
+            db_session, tour, venues[0], day_offset=0, ticket_price=None,
+            base_time=BASE_TIME, tickets_sold=0,
+        )
+
+        response = client.get("/api/v1/stats/revenue/cities")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["city"] == venues[0].city
+        assert data[0]["revenue"] == 0
+
+    def test_unknown_subpath_returns_404(self, client):
+        response = client.get("/api/v1/stats/revenue/citiez")
+
+        assert response.status_code == 404
