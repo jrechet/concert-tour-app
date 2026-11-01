@@ -172,6 +172,27 @@ class TestGetRevenueByCity:
         assert result[0].city_name == venues[0].city
         assert result[0].revenue == 250.0
 
+    def test_city_with_only_priceless_concerts_reports_zero_revenue(self, db_session):
+        venues = create_venues(db_session, count=1)
+        tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=0, ticket_price=None,
+            base_time=BASE_TIME, tickets_sold=50,
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=1, ticket_price=None,
+            base_time=BASE_TIME, tickets_sold=20,
+        )
+
+        result = get_revenue_by_city(db_session)
+
+        assert len(result) == 1
+        assert result[0].city_name == venues[0].city
+        assert result[0].revenue == 0.0
+
     def test_city_with_only_cancelled_concerts_is_omitted(self, db_session):
         venues = create_venues(db_session, count=1)
         tour = create_tour(
