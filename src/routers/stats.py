@@ -12,7 +12,7 @@ from ..database import get_db, get_reference_time
 from ..schemas import (
     CapacityStats,
     CitiesResponse,
-    CityRevenueOut,
+    CityRevenue,
     CountResponse,
     CountryConcertCount,
     MonthlyConcertCount,
@@ -117,7 +117,7 @@ def get_prices_stats(db: Session = Depends(get_db)):
     return get_price_stats(db)
 
 
-@router.get("/revenue/cities", response_model=List[CityRevenueOut])
+@router.get("/revenue/cities", response_model=List[CityRevenue], status_code=200)
 def get_revenue_by_city_stats(db: Session = Depends(get_db)):
     """Retrieve per-city revenue for non-cancelled concerts, ordered by
     revenue descending.
@@ -125,7 +125,7 @@ def get_revenue_by_city_stats(db: Session = Depends(get_db)):
     Returns 200 with an empty list (not an error) when there is no data.
     """
     return [
-        CityRevenueOut(city=entry.city_name, revenue=entry.revenue)
+        CityRevenue(city=entry.city_name, revenue=entry.revenue)
         for entry in get_revenue_by_city(db)
     ]
 
