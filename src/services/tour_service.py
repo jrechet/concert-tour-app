@@ -7,7 +7,7 @@ from typing import List, NamedTuple, Optional
 from sqlalchemy import and_, case, func
 from sqlalchemy.orm import Session
 
-from ..config import MAX_ARTIST_SEARCH_RESULTS
+from ..config import MAX_ARTIST_SEARCH_RESULTS, TOUR_COPY_NAME_SUFFIX
 from ..database import get_reference_time
 from ..models import Concert, Tour, Venue
 from ..schemas.tour import OCCUPANCY_PERCENTAGE_PRECISION, TourCityOut, TourOccupancySchema, TourStatus
@@ -169,16 +169,16 @@ def duplicate_tour(db: Session, tour_id: int) -> Optional[Tour]:
     """Duplicate a tour as a new, persisted `planned` tour with no concerts.
 
     Copies `artist`, `start_date`, `end_date`, and `description` from the
-    source tour, and names the copy `f"{source.name} (copy)"`. The source
-    tour's concerts are not duplicated. Returns `None` when no tour with
-    `tour_id` exists, so the router can translate that into a 404.
+    source tour, and names the copy `f"{source.name}{TOUR_COPY_NAME_SUFFIX}"`.
+    The source tour's concerts are not duplicated. Returns `None` when no
+    tour with `tour_id` exists, so the router can translate that into a 404.
     """
     source = db.query(Tour).filter(Tour.id == tour_id).first()
     if source is None:
         return None
 
     duplicate = Tour(
-        name=f"{source.name} (copy)",
+        name=f"{source.name}{TOUR_COPY_NAME_SUFFIX}",
         artist=source.artist,
         start_date=source.start_date,
         end_date=source.end_date,

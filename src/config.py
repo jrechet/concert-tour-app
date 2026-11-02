@@ -27,3 +27,6 @@ CITY_SEARCH_DEBOUNCE_MS = int(os.environ.get("CITY_SEARCH_DEBOUNCE_MS", "300"))
 
 # Upper bound on the number of tours returned by the artist search.
 MAX_ARTIST_SEARCH_RESULTS = int(os.environ.get("MAX_ARTIST_SEARCH_RESULTS", "50"))
+
+# Suffix appended to a tour's name when it is duplicated via `duplicate_tour`.
+TOUR_COPY_NAME_SUFFIX = os.environ.get("TOUR_COPY_NAME_SUFFIX", " (copy)")
