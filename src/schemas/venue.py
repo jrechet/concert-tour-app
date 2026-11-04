@@ -7,6 +7,8 @@ from typing import Any, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .tour import TourStatus
+
 
 class VenueCreate(BaseModel):
     """Schema for creating a venue."""
@@ -128,5 +130,36 @@ class VenueDetailResponse(BaseModel):
     country: str = Field(..., description="Country the venue is located in")
     capacity: Optional[int] = Field(None, description="Venue capacity")
     upcoming_concerts: List[ConcertSummary] = Field(
+        default_factory=list, description="Upcoming concerts scheduled at this venue"
+    )
+
+
+class VenueConcertRead(BaseModel):
+    """Read-only schema for a concert nested under `VenueDetailRead.upcoming_concerts`.
+
+    `status` reuses `TourStatus` (the only concert/tour status enum defined
+    in the codebase, under `src.schemas.tour`) instead of redeclaring the
+    valid status strings here.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = Field(..., description="Unique concert identifier")
+    title: str = Field(..., description="Concert title")
+    start_datetime: datetime = Field(..., description="Concert start date and time")
+    status: Optional[TourStatus] = Field(None, description="Concert status")
+
+
+class VenueDetailRead(BaseModel):
+    """Read-only schema for the venue detail payload, with nested upcoming concerts."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = Field(..., description="Unique venue identifier")
+    name: str = Field(..., description="Venue name")
+    city: str = Field(..., description="City the venue is located in")
+    country: str = Field(..., description="Country the venue is located in")
+    capacity: Optional[int] = Field(None, description="Venue capacity")
+    upcoming_concerts: List[VenueConcertRead] = Field(
         default_factory=list, description="Upcoming concerts scheduled at this venue"
     )
