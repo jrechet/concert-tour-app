@@ -3,9 +3,9 @@ Pydantic schemas for Venue entities.
 """
 
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AliasPath, BaseModel, ConfigDict, Field, field_validator
 
 from .tour import TourStatus
 
@@ -86,68 +86,31 @@ class VenueOut(BaseModel):
         }
 
 
-class ConcertSummary(BaseModel):
-    """Lightweight summary of a concert, embedded in `VenueDetailResponse`.
-
-    `status` and `artist` live on the concert's parent `Tour`
-    (`Tour.status`/`Tour.artist`), not on `Concert` itself, so a `Concert`
-    ORM object is flattened onto this schema's shape before validation
-    rather than relying on `from_attributes` to walk the relationship.
-    """
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int = Field(..., description="Unique concert identifier")
-    date: datetime = Field(..., description="Concert date and time")
-    status: Optional[str] = Field(None, description="Status of the tour this concert belongs to")
-    artist: Optional[str] = Field(None, description="Artist performing on the tour this concert belongs to")
-
-    @model_validator(mode="before")
-    @classmethod
-    def _flatten_concert(cls, data: Any) -> Any:
-        """Pass dicts straight through; flatten a `Concert`-like ORM object
-        (with a `date_time` field and a `tour` relationship) into this
-        schema's flat fields."""
-        if isinstance(data, dict):
-            return data
-        tour = getattr(data, "tour", None)
-        return {
-            "id": data.id,
-            "date": data.date_time,
-            "status": getattr(tour, "status", None),
-            "artist": getattr(tour, "artist", None),
-        }
-
-
-class VenueDetailResponse(BaseModel):
-    """Schema for the venue detail endpoint, with upcoming concerts nested."""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int = Field(..., description="Unique venue identifier")
-    name: str = Field(..., description="Venue name")
-    city: str = Field(..., description="City the venue is located in")
-    country: str = Field(..., description="Country the venue is located in")
-    capacity: Optional[int] = Field(None, description="Venue capacity")
-    upcoming_concerts: List[ConcertSummary] = Field(
-        default_factory=list, description="Upcoming concerts scheduled at this venue"
-    )
-
-
 class VenueConcertRead(BaseModel):
     """Read-only schema for a concert nested under `VenueDetailRead.upcoming_concerts`.
 
+    `title` and `status` are sourced from the concert's parent `Tour`
+    (`Concert` has no `title` or `status` column of its own), via
+    `AliasPath` so a real `Concert` ORM object validates directly.
     `status` reuses `TourStatus` (the only concert/tour status enum defined
     in the codebase, under `src.schemas.tour`) instead of redeclaring the
     valid status strings here.
     """
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: int = Field(..., description="Unique concert identifier")
-    title: str = Field(..., description="Concert title")
-    start_datetime: datetime = Field(..., description="Concert start date and time")
-    status: Optional[TourStatus] = Field(None, description="Concert status")
+    title: str = Field(
+        ..., validation_alias=AliasPath("tour", "name"), description="Title of the tour this concert belongs to"
+    )
+    start_datetime: datetime = Field(
+        ..., validation_alias="date_time", description="Concert start date and time"
+    )
+    status: Optional[TourStatus] = Field(
+        None,
+        validation_alias=AliasPath("tour", "status"),
+        description="Status of the parent tour this concert belongs to",
+    )
 
 
 class VenueDetailRead(BaseModel):
