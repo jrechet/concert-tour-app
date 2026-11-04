@@ -1,5 +1,6 @@
 """Query logic backing the venue-detail and venue-creation endpoints."""
 
+from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import and_
@@ -39,21 +40,24 @@ def create_venue(db: Session, venue: VenueCreate) -> Venue:
     return db_venue
 
 
-def get_venue_with_upcoming_concerts(db: Session, venue_id: int) -> Optional[Venue]:
+def get_venue_with_upcoming_concerts(
+    db: Session, venue_id: int, reference_time: Optional[datetime] = None,
+) -> Optional[Venue]:
     """Return the venue with id `venue_id`, its `concerts` relationship
     populated with only the upcoming, non-cancelled ones.
 
     A concert is "upcoming" when its `date_time` is at or after
-    `get_reference_time()`, mirroring `get_next_concert`'s definition.
-    The eligible concerts are ordered soonest first (ascending by date).
-    Uses an outer join plus `contains_eager` so the real `Concert.venue`
-    foreign key relationship drives the filtering/loading in a single
-    query, and a venue with no eligible concerts still comes back (with an
-    empty `concerts` list) rather than being dropped by the join. Returns
-    `None` when no venue with `venue_id` exists, so the router can
-    translate that into a 404.
+    `reference_time` (defaulting to `get_reference_time()` when omitted,
+    mirroring `get_next_concert`'s definition). The eligible concerts are
+    ordered soonest first (ascending by date). Uses an outer join plus
+    `contains_eager` so the real `Concert.venue` foreign key relationship
+    drives the filtering/loading in a single query, and a venue with no
+    eligible concerts still comes back (with an empty `concerts` list)
+    rather than being dropped by the join. Returns `None` when no venue
+    with `venue_id` exists, so the router can translate that into a 404.
     """
-    reference_time = get_reference_time()
+    if reference_time is None:
+        reference_time = get_reference_time()
     # `.first()` would add a SQL `LIMIT 1` to a query that joins one venue
     # row to many concert rows, truncating the eager-loaded collection to a
     # single concert; `.all()` lets every joined row contribute to it, and
