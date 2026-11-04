@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..crud.venue import create_venue, get_venue_with_upcoming_concerts, venue_name_city_exists
 from ..database import get_db
-from ..schemas.venue import VenueCreate, VenueDetailResponse, VenueOut, VenueResponse
+from ..schemas.venue import VenueCreate, VenueDetailRead, VenueOut, VenueResponse
 from ..services.venue_service import list_venues
 
 router = APIRouter(prefix="/api/v1/venues", tags=["venues"])
@@ -53,14 +53,14 @@ def get_venues(
     return list_venues(db, min_capacity=min_capacity)
 
 
-@router.get("/{venue_id}", response_model=VenueDetailResponse)
+@router.get("/{venue_id}", response_model=VenueDetailRead)
 def get_venue(venue_id: int, db: Session = Depends(get_db)):
     """Retrieve a single venue with its upcoming, non-cancelled concerts
     ordered soonest-first. Raises 404 when `venue_id` does not exist."""
     venue = get_venue_with_upcoming_concerts(db, venue_id)
     if venue is None:
         raise HTTPException(status_code=404, detail="Venue not found")
-    return VenueDetailResponse(
+    return VenueDetailRead(
         id=venue.id,
         name=venue.name,
         city=venue.city,

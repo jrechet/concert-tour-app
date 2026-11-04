@@ -40,7 +40,7 @@ from .concert import (
     SoldOutConcertVenue,
     TicketPriceUpdate,
 )
-from .venue import VenueCreate, VenueResponse
+from .venue import VenueConcertRead, VenueCreate, VenueDetailRead, VenueResponse
 from .lineup_entry import LineupEntryResponse
 from .lineup import (
     LineupEntryCreate,
@@ -74,6 +74,8 @@ __all__ = [
     "ArtistSummary",
     "VenueCreate",
     "VenueResponse",
+    "VenueConcertRead",
+    "VenueDetailRead",
     "TourStatus",
     "TourCreate",
     "TourUpdate",
