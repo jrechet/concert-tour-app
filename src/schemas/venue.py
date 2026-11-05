@@ -9,6 +9,8 @@ from pydantic import AliasPath, BaseModel, ConfigDict, Field, field_validator
 
 from .tour import TourStatus
 
+MIN_VENUE_CAPACITY = 0
+
 
 class VenueCreate(BaseModel):
     """Schema for creating a venue."""
@@ -16,7 +18,7 @@ class VenueCreate(BaseModel):
     name: str = Field(..., min_length=1, description="Venue name")
     city: str = Field(..., description="City the venue is located in")
     country: str = Field(..., description="Country the venue is located in")
-    capacity: int = Field(..., gt=0, description="Venue capacity")
+    capacity: int = Field(..., gt=MIN_VENUE_CAPACITY, description="Venue capacity")
 
     @field_validator("name")
     @classmethod
