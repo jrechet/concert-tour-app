@@ -14,6 +14,11 @@ RESCHEDULE_CLOCK_SKEW_TOLERANCE_SECONDS = float(
 
 MAX_NOTES_LENGTH = 500
 
+# Mirrors the `Concert.ticket_price` column (`Numeric(10, 2)`).
+TICKET_PRICE_MAX_DIGITS = 10
+TICKET_PRICE_DECIMAL_PLACES = 2
+MIN_TICKET_PRICE = Decimal("0")
+
 
 class ConcertCreate(BaseModel):
     """Schema for creating a new concert."""
@@ -93,6 +98,32 @@ class TicketPriceUpdate(BaseModel):
         schema_extra = {
             "example": {
                 "ticket_price": "175.00",
+            }
+        }
+
+
+class ConcertPriceUpdate(BaseModel):
+    """Schema for the request body of a concert ticket-price update.
+
+    `ticket_price` is accepted as a string (e.g. `"49.50"`) and coerced to
+    `Decimal`, matching the precision of the `Concert.ticket_price` column,
+    so a negative value is rejected by validation before it reaches the
+    route handler.
+    """
+
+    ticket_price: Decimal = Field(
+        ...,
+        ge=MIN_TICKET_PRICE,
+        max_digits=TICKET_PRICE_MAX_DIGITS,
+        decimal_places=TICKET_PRICE_DECIMAL_PLACES,
+        description="New ticket price",
+    )
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "ticket_price": "49.50",
             }
         }
 
