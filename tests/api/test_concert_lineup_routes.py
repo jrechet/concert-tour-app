@@ -51,6 +51,17 @@ def test_delete_lineup_returns_204_and_clears_acts(client, db_session):
     assert lineup_response.json() == []
 
 
+def test_delete_lineup_twice_in_a_row_returns_204_both_times(client, db_session):
+    concert = _seed_concert_with_lineup(db_session)
+
+    first_response = client.delete(f"/api/v1/concerts/{concert.id}/lineup")
+    second_response = client.delete(f"/api/v1/concerts/{concert.id}/lineup")
+
+    assert first_response.status_code == 204
+    assert second_response.status_code == 204
+    assert second_response.content == b""
+
+
 def test_delete_lineup_unknown_concert_returns_404(client, db_session):
     concert = _seed_concert_with_lineup(db_session)
     nonexistent_id = concert.id + 1
