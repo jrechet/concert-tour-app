@@ -282,7 +282,8 @@ def get_sold_out_tours(db: Session) -> List[Tour]:
     concerts (none at all, or all cancelled) are excluded. Computed via a
     single grouped query comparing the count of non-cancelled concerts
     against the count of non-cancelled, sold-out ones per tour, rather
-    than a Python loop.
+    than a Python loop. Results are ordered by `id` ascending for a
+    deterministic order.
     """
     is_sold_out = case(
         (and_(Venue.capacity.isnot(None), Concert.tickets_sold >= Venue.capacity), 1),
@@ -298,7 +299,12 @@ def get_sold_out_tours(db: Session) -> List[Tour]:
         .scalar_subquery()
     )
 
-    return db.query(Tour).filter(Tour.id.in_(qualifying_tour_ids)).all()
+    return (
+        db.query(Tour)
+        .filter(Tour.id.in_(qualifying_tour_ids))
+        .order_by(Tour.id)
+        .all()
+    )
 
 
 def _escape_like_wildcards(value: str) -> str:
