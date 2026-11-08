@@ -95,6 +95,30 @@ class TestGetSoldOutTours:
 
         assert [t.id for t in result] == [tour.id]
 
+    def test_orders_multiple_qualifying_tours_by_id_ascending(self, db_session):
+        venues = create_venues(db_session, count=2)
+        second_tour = create_tour(
+            db_session, "Second Wave Tour", "Nova Reyes",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        first_tour = create_tour(
+            db_session, "Opening Night Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        create_concert(
+            db_session, second_tour, venues[0], day_offset=0, ticket_price="80.00",
+            base_time=BASE_TIME, tickets_sold=venues[0].capacity,
+        )
+        create_concert(
+            db_session, first_tour, venues[1], day_offset=1, ticket_price="120.00",
+            base_time=BASE_TIME, tickets_sold=venues[1].capacity,
+        )
+
+        result = get_sold_out_tours(db_session)
+
+        assert [t.id for t in result] == sorted(t.id for t in result)
+        assert {t.id for t in result} == {first_tour.id, second_tour.id}
+
     def test_no_qualifying_tour_returns_empty_list(self, db_session):
         venues = create_venues(db_session, count=1)
         tour = create_tour(
