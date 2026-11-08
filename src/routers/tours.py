@@ -20,6 +20,7 @@ from ..schemas import (
     TourRead,
     TourResponse,
     TourSearchQuery,
+    SoldOutTourRead,
     TourSpanRead,
     TourStatus,
     TourSummary,
@@ -91,7 +92,7 @@ def search_tours_by_artist_endpoint(
     return search_tours_by_artist(db, query.artist)
 
 
-@router.get("/sold-out", response_model=List[TourResponse])
+@router.get("/sold-out", response_model=List[SoldOutTourRead])
 def get_sold_out_tours_endpoint(db: Session = Depends(get_db)):
     """Retrieve tours where every non-cancelled concert is sold out."""
     return get_sold_out_tours(db)
