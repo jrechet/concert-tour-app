@@ -133,6 +133,25 @@ class TourSearchQuery(BaseModel):
 TourRead = TourResponse
 
 
+class SoldOutTourRead(BaseModel):
+    """Schema for a single entry in `GET /api/v1/tours/sold-out`.
+
+    `TourResponse`/`TourRead` use the pydantic v1 `orm_mode` config key,
+    which pydantic v2 does not translate into `from_attributes`, so they
+    cannot read ORM attributes without passing `from_attributes=True` at
+    every call site. This schema is a thin, properly-configured
+    alternative exposing just the fields the listing needs.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = Field(..., description="Unique tour identifier")
+    name: str = Field(..., description="Tour name")
+    start_date: date = Field(..., description="Tour start date")
+    end_date: date = Field(..., description="Tour end date")
+    status: Optional[str] = Field(None, description="Tour status")
+
+
 class TourSummary(BaseModel):
     """Schema for the tour summary API response."""
 

@@ -7,6 +7,7 @@ from datetime import date
 import pytest
 from pydantic import ValidationError
 
+from src.models.tour import Tour
 from src.schemas.tour import (
     CancelTourRequest,
     CancelTourResponse,
@@ -14,6 +15,7 @@ from src.schemas.tour import (
     TourCancelResponse,
     TourCitiesResponse,
     TourCityOut,
+    SoldOutTourRead,
 )
 
 
@@ -130,3 +132,55 @@ class TestTourCityOut:
     def test_tour_city_out_rejects_missing_city(self):
         with pytest.raises(ValidationError):
             TourCityOut(first_concert_date="2024-06-01")
+
+
+class TestSoldOutTourRead:
+    """Test cases for `SoldOutTourRead`, the item schema for
+    `GET /api/v1/tours/sold-out`."""
+
+    def test_valid_tour_instance_serialises_expected_fields(self):
+        tour = Tour(
+            id=1,
+            name="World Tour 2024",
+            artist="Queen",
+            start_date=date(2024, 6, 1),
+            end_date=date(2024, 12, 31),
+            description="An amazing world tour",
+            status="active",
+        )
+
+        read = SoldOutTourRead.model_validate(tour)
+
+        assert read.model_dump() == {
+            "id": 1,
+            "name": "World Tour 2024",
+            "start_date": date(2024, 6, 1),
+            "end_date": date(2024, 12, 31),
+            "status": "active",
+        }
+
+    def test_missing_required_field_raises(self):
+        tour = Tour(
+            id=2,
+            artist="Queen",
+            start_date=date(2024, 6, 1),
+            end_date=date(2024, 12, 31),
+        )
+
+        with pytest.raises(ValidationError):
+            SoldOutTourRead.model_validate(tour)
+
+    def test_nullable_status_serialises_as_null_not_dropped(self):
+        tour = Tour(
+            id=3,
+            name="Solo Tour",
+            artist="Artist",
+            start_date=date(2024, 1, 1),
+            end_date=date(2024, 2, 1),
+            status=None,
+        )
+
+        dumped = SoldOutTourRead.model_validate(tour).model_dump()
+
+        assert "status" in dumped
+        assert dumped["status"] is None
