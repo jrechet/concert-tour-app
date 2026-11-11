@@ -1,11 +1,14 @@
 """Unit tests for `get_concerts_per_weekday`, `get_revenue_by_city`,
-`get_capacity_stats`, and `count_concerts_per_month`."""
+`get_capacity_stats`, `count_concerts_per_month`, and
+`count_concerts_per_artist`."""
 
 from datetime import datetime, timedelta
 
 from src.schemas.stats import CapacityStats, MonthlyConcertCount
 from src.services.stats_service import (
+    ArtistConcertCount,
     CityRevenue,
+    count_concerts_per_artist,
     count_concerts_per_month,
     get_capacity_stats,
     get_concerts_per_weekday,
@@ -445,3 +448,127 @@ class TestCountConcertsPerMonth:
 
         assert len(result) == 1
         assert isinstance(result[0], MonthlyConcertCount)
+
+
+class TestCountConcertsPerArtist:
+    """Coverage for `count_concerts_per_artist`."""
+
+    def test_empty_database_returns_empty_list(self, db_session):
+        assert count_concerts_per_artist(db_session) == []
+
+    def test_artists_ordered_by_concert_count_descending(self, db_session):
+        venues = create_venues(db_session, count=4)
+        busy_tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        quiet_tour = create_tour(
+            db_session, "Homecoming Revival Tour", "The Midnight Collective",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        for i in range(3):
+            create_concert(
+                db_session, busy_tour, venues[i], day_offset=i, ticket_price="80.00",
+                base_time=BASE_TIME,
+            )
+        create_concert(
+            db_session, quiet_tour, venues[3], day_offset=0, ticket_price="90.00",
+            base_time=BASE_TIME,
+        )
+
+        result = count_concerts_per_artist(db_session)
+
+        assert [entry.name for entry in result] == ["Aurora Belle", "The Midnight Collective"]
+        assert [entry.concert_count for entry in result] == [3, 1]
+
+    def test_ties_broken_by_name_ascending(self, db_session):
+        venues = create_venues(db_session, count=2)
+        tour_b = create_tour(
+            db_session, "Neon Skyline World Tour", "Zephyr Nightingale",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        tour_a = create_tour(
+            db_session, "Homecoming Revival Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        create_concert(
+            db_session, tour_b, venues[0], day_offset=0, ticket_price="80.00",
+            base_time=BASE_TIME,
+        )
+        create_concert(
+            db_session, tour_a, venues[1], day_offset=0, ticket_price="90.00",
+            base_time=BASE_TIME,
+        )
+
+        result = count_concerts_per_artist(db_session)
+
+        assert [entry.name for entry in result] == ["Aurora Belle", "Zephyr Nightingale"]
+        assert [entry.concert_count for entry in result] == [1, 1]
+
+    def test_artist_with_no_concerts_appears_with_zero_count(self, db_session):
+        venues = create_venues(db_session, count=1)
+        touring_artist = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        create_tour(
+            db_session, "Unannounced Tour", "TBD Collective",
+            BASE_TIME.date(), BASE_TIME.date(), "planned",
+        )
+        create_concert(
+            db_session, touring_artist, venues[0], day_offset=0, ticket_price="80.00",
+            base_time=BASE_TIME,
+        )
+
+        result = count_concerts_per_artist(db_session)
+
+        assert [entry.name for entry in result] == ["Aurora Belle", "TBD Collective"]
+        assert [entry.concert_count for entry in result] == [1, 0]
+
+    def test_single_query_issued(self, db_session):
+        venues = create_venues(db_session, count=2)
+        tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=0, ticket_price="80.00",
+            base_time=BASE_TIME,
+        )
+        create_concert(
+            db_session, tour, venues[1], day_offset=1, ticket_price="90.00",
+            base_time=BASE_TIME,
+        )
+
+        queries = []
+        engine = db_session.get_bind()
+        from sqlalchemy import event as sa_event
+
+        def _record(conn, cursor, statement, parameters, context, executemany):
+            queries.append(statement)
+
+        sa_event.listen(engine, "before_cursor_execute", _record)
+        try:
+            count_concerts_per_artist(db_session)
+        finally:
+            sa_event.remove(engine, "before_cursor_execute", _record)
+
+        select_queries = [q for q in queries if q.strip().upper().startswith("SELECT")]
+        assert len(select_queries) == 1
+
+    def test_result_items_are_artist_concert_count_instances(self, db_session):
+        venues = create_venues(db_session, count=1)
+        tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=0, ticket_price="80.00",
+            base_time=BASE_TIME,
+        )
+
+        result = count_concerts_per_artist(db_session)
+
+        assert len(result) == 1
+        assert isinstance(result[0], ArtistConcertCount)
+        assert result[0].artist_id == "Aurora Belle"
