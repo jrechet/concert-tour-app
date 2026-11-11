@@ -13,6 +13,16 @@
         {% if concert.is_cancelled %}
         <span class="cancellation-badge" role="status">Cancelled</span>
         {% endif %}
+        {% if concert.remaining_tickets is not none %}
+        {% if concert.sold_out %}
+        <span class="ticket-badge ticket-badge-sold-out" role="status">Sold out</span>
+        {% else %}
+        {% if concert.remaining_tickets <= low_stock_threshold %}
+        <span class="ticket-badge ticket-badge-low-stock" role="status">Low stock</span>
+        {% endif %}
+        <span class="ticket-count">{{ concert.remaining_tickets }} tickets left</span>
+        {% endif %}
+        {% endif %}
     </li>
     {% endfor %}
 </ul>

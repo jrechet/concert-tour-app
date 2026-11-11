@@ -14,7 +14,7 @@ from sqlalchemy import case, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
-from ..config import CITY_SEARCH_DEBOUNCE_MS, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from ..config import CITY_SEARCH_DEBOUNCE_MS, DEFAULT_PAGE_SIZE, LOW_STOCK_THRESHOLD, MAX_PAGE_SIZE
 from ..database import get_db, get_reference_time
 from ..models import Concert, LineupEntry, Tour, Venue
 from ..schemas import (
@@ -873,6 +873,7 @@ def get_concert_list(
         "city": normalized_city,
         "city_max_length": MAX_CITY_QUERY_LENGTH,
         "city_search_debounce_ms": CITY_SEARCH_DEBOUNCE_MS,
+        "low_stock_threshold": LOW_STOCK_THRESHOLD,
     }
 
     template_name = (
