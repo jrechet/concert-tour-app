@@ -30,3 +30,7 @@ MAX_ARTIST_SEARCH_RESULTS = int(os.environ.get("MAX_ARTIST_SEARCH_RESULTS", "50"
 
 # Suffix appended to a tour's name when it is duplicated via `duplicate_tour`.
 TOUR_COPY_NAME_SUFFIX = os.environ.get("TOUR_COPY_NAME_SUFFIX", " (copy)")
+
+# Number of remaining tickets at or below which a concert is flagged as
+# "low stock" on the concert list page (but above zero, which is "sold out").
+LOW_STOCK_THRESHOLD = int(os.environ.get("LOW_STOCK_THRESHOLD", "10"))

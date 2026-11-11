@@ -294,6 +294,20 @@ a {
   color: var(--color-bg);
 }
 
+.ticket-badge-low-stock {
+  background-color: var(--color-accent-secondary);
+  color: var(--color-bg);
+}
+
+.concert-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
 .occupancy-percentage {
   color: var(--color-accent-secondary);
   font-size: var(--font-size-sm);
