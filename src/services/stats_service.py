@@ -15,7 +15,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import get_reference_time
-from ..models import Concert, Venue
+from ..models import Concert, Tour, Venue
 from ..schemas.stats import CapacityStats, MonthlyConcertCount, PriceStats, WEEKDAY_NAMES
 
 
@@ -259,3 +259,41 @@ def get_capacity_stats(db: Session, reference_time: Optional[datetime] = None) -
         tickets_sold=tickets_sold,
         seats_left=max(total_capacity - tickets_sold, 0),
     )
+
+
+@dataclass
+class ArtistConcertCount:
+    """Concert count aggregated for a single artist.
+
+    There is no dedicated `Artist` table in this schema -- `Tour.artist` is
+    a plain string column -- so `artist_id` is the artist name itself, the
+    only stable identifier available to group tours/concerts by (mirroring
+    `CityRevenue.city_id` for `Venue.city` above).
+    """
+
+    artist_id: str
+    name: str
+    concert_count: int
+
+
+def count_concerts_per_artist(db: Session) -> List[ArtistConcertCount]:
+    """Return per-artist concert counts, in one query, ordered by count
+    descending (ties broken by name ascending).
+
+    Every artist with at least one tour is included via a `LEFT OUTER
+    JOIN` from `Tour` to `Concert` on `tour_id`, so an artist whose tour(s)
+    currently have no concerts scheduled still appears, with
+    `concert_count` equal to 0, rather than being omitted. Returns `[]`
+    when there are no tours at all.
+    """
+    rows = (
+        db.query(Tour.artist, func.count(Concert.id).label("concert_count"))
+        .outerjoin(Concert, Concert.tour_id == Tour.id)
+        .group_by(Tour.artist)
+        .order_by(func.count(Concert.id).desc(), Tour.artist.asc())
+        .all()
+    )
+    return [
+        ArtistConcertCount(artist_id=artist, name=artist, concert_count=count)
+        for artist, count in rows
+    ]
