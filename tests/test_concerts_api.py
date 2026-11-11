@@ -151,6 +151,41 @@ class TestRemainingTicketsOnGetEndpoints:
         assert data["remaining_tickets"] == 0
         assert data["sold_out"] is True
 
+    def test_list_with_mixed_concerts_reports_correct_remaining_tickets(self, client, db_session):
+        """A list containing an untouched, a partially sold, and a sold-out
+        concert reports remaining_tickets as capacity, capacity - sold, and
+        0 respectively."""
+        tour = create_tour(
+            db_session,
+            name="Mixed Concerts Tour",
+            artist="Test Artist",
+            start_date=(datetime.now() - timedelta(days=1)).date(),
+            end_date=(datetime.now() + timedelta(days=90)).date(),
+            status="active",
+        )
+        venues = create_venues(db_session, count=3)
+        create_concert(
+            db_session, tour, venues[0], day_offset=1, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=0,
+        )
+        create_concert(
+            db_session, tour, venues[1], day_offset=2, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=50,
+        )
+        create_concert(
+            db_session, tour, venues[2], day_offset=3, ticket_price="50.00",
+            base_time=datetime.now(), tickets_sold=venues[2].capacity,
+        )
+
+        response = client.get("/api/v1/concerts/")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 3
+        by_venue = {row["venue_id"]: row for row in data}
+        assert by_venue[venues[0].id]["remaining_tickets"] == venues[0].capacity
+        assert by_venue[venues[1].id]["remaining_tickets"] == venues[1].capacity - 50
+        assert by_venue[venues[2].id]["remaining_tickets"] == 0
+
     def test_sold_out_concert_in_list_returns_zero_remaining_tickets(self, client, db_session):
         """A sold-out concert also reports remaining_tickets 0 via the list
         endpoint."""
@@ -291,6 +326,12 @@ class TestTicketsRemainingAndSoldOutExposure:
         assert response.status_code == 404
         assert response.json() == {"detail": "Concert not found"}
 
+    def test_list_endpoint_with_no_concerts_returns_empty_list(self, client, db_session):
+        """An empty database yields a 200 with an empty list, not an error."""
+        response = client.get("/api/v1/concerts/")
+        assert response.status_code == 200
+        assert response.json() == []
+
 
 class TestConcertListCityQueryParam:
     """`GET /api/v1/concerts/` accepts an optional `city` filter, narrowed
@@ -331,6 +372,7 @@ class TestConcertListCityQueryParam:
         data = response.json()
         assert len(data) == 1
         assert data[0]["venue_id"] == paris.id
+        assert isinstance(data[0]["remaining_tickets"], int)
 
     def test_city_param_matches_case_insensitive_partial_text(self, client, db_session):
         venues = self._seed_three_cities(db_session)
