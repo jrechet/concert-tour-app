@@ -1,6 +1,6 @@
 """SQLAlchemy model for Concert entity."""
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Numeric, String, event
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, Numeric, String, event
 from sqlalchemy.orm import relationship, validates
 
 from ..config import ALMOST_SOLD_OUT_THRESHOLD
@@ -11,6 +11,9 @@ class Concert(Base):
     """Concert database model, linking a Tour to a Venue on a given date."""
 
     __tablename__ = "concerts"
+    __table_args__ = (
+        Index("ix_concerts_venue_id_date_time", "venue_id", "date_time"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     tour_id = Column(Integer, ForeignKey("tours.id"), nullable=False, index=True)
