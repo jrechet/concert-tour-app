@@ -41,26 +41,30 @@ class TestArtistConcertCount:
     """Test cases for the `ArtistConcertCount` schema."""
 
     def test_valid_payload_round_trips_through_model_dump(self):
-        item = ArtistConcertCount(artist_id=1, name="The Rolling Stones", concert_count=12)
+        item = ArtistConcertCount(
+            artist_id="The Rolling Stones", name="The Rolling Stones", concert_count=12
+        )
         assert item.model_dump() == {
-            "artist_id": 1,
+            "artist_id": "The Rolling Stones",
             "name": "The Rolling Stones",
             "concert_count": 12,
         }
 
     def test_negative_concert_count_raises(self):
         with pytest.raises(ValidationError):
-            ArtistConcertCount(artist_id=1, name="The Rolling Stones", concert_count=-1)
+            ArtistConcertCount(
+                artist_id="The Rolling Stones", name="The Rolling Stones", concert_count=-1
+            )
 
     def test_missing_name_raises(self):
         with pytest.raises(ValidationError):
-            ArtistConcertCount(artist_id=1, concert_count=12)
+            ArtistConcertCount(artist_id="The Rolling Stones", concert_count=12)
 
     def test_builds_from_attribute_carrying_object(self):
-        row = ArtistRow(artist_id=2, name="Daft Punk", concert_count=7)
+        row = ArtistRow(artist_id="Daft Punk", name="Daft Punk", concert_count=7)
         item = ArtistConcertCount.model_validate(row)
         assert item.model_dump() == {
-            "artist_id": 2,
+            "artist_id": "Daft Punk",
             "name": "Daft Punk",
             "concert_count": 7,
         }

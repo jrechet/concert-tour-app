@@ -228,9 +228,14 @@ class CapacityStats(BaseModel):
 
 
 class ArtistConcertCount(BaseModel):
-    """Number of concerts performed by a single artist."""
+    """Number of concerts performed by a single artist.
 
-    artist_id: int = Field(..., description="Artist identifier")
+    There is no dedicated `Artist` table in this schema -- `artist_id` is
+    the artist name itself, the only stable identifier available (mirroring
+    `CityRevenue.city` being the city name for the same reason).
+    """
+
+    artist_id: str = Field(..., description="Artist identifier (the artist name)")
     name: str = Field(..., description="Artist name")
     concert_count: int = Field(..., ge=0, description="Number of concerts performed by this artist")
 
@@ -239,7 +244,7 @@ class ArtistConcertCount(BaseModel):
         from_attributes = True
         schema_extra = {
             "example": {
-                "artist_id": 1,
+                "artist_id": "The Rolling Stones",
                 "name": "The Rolling Stones",
                 "concert_count": 12,
             }

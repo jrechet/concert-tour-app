@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db, get_reference_time
 from ..schemas import (
+    ArtistConcertCount,
     CapacityStats,
     CitiesResponse,
     CityRevenue,
@@ -24,6 +25,7 @@ from ..schemas import (
     WeekdayStatsResponse,
 )
 from ..services.stats_service import (
+    count_concerts_per_artist,
     get_capacity_stats,
     get_concert_count,
     get_concert_counts_by_country,
@@ -137,6 +139,16 @@ def get_capacity(db: Session = Depends(get_db)):
     Returns 200 with 0/0/0 (not an error) when there is no eligible data.
     """
     return get_capacity_stats(db)
+
+
+@router.get("/artists", response_model=List[ArtistConcertCount], status_code=200)
+def get_artists_stats(db: Session = Depends(get_db)):
+    """Retrieve the number of concerts per artist, ordered by concert count
+    descending (ties broken alphabetically by name).
+
+    Returns 200 with an empty list (not an error) when there is no lineup.
+    """
+    return count_concerts_per_artist(db)
 
 
 @router.get("/weekdays", response_model=WeekdayStatsResponse)
