@@ -227,6 +227,25 @@ class CapacityStats(BaseModel):
         }
 
 
+class ArtistConcertCount(BaseModel):
+    """Number of concerts performed by a single artist."""
+
+    artist_id: int = Field(..., description="Artist identifier")
+    name: str = Field(..., description="Artist name")
+    concert_count: int = Field(..., ge=0, description="Number of concerts performed by this artist")
+
+    class Config:
+        """Pydantic configuration."""
+        from_attributes = True
+        schema_extra = {
+            "example": {
+                "artist_id": 1,
+                "name": "The Rolling Stones",
+                "concert_count": 12,
+            }
+        }
+
+
 class WeekdayCount(BaseModel):
     """Number of concerts held on a single weekday."""
 
