@@ -4,6 +4,7 @@ Pydantic schemas for Concert entities.
 
 import os
 from datetime import date, datetime, timedelta, timezone
+from enum import Enum
 from typing import Optional
 from pydantic import AliasPath, BaseModel, ConfigDict, Field, field_validator, model_validator, root_validator, validator
 from decimal import Decimal
@@ -376,6 +377,50 @@ class ConcertResponse(BaseModel):
                 "notes": None
             }
         }
+
+
+class ConcertStatus(str, Enum):
+    """Derived status for a concert.
+
+    `Concert` has no `status` column of its own (cancellation is tracked
+    via the `is_cancelled` boolean), so this enum exists purely to give
+    `ConcertSummary.status` a non-hardcoded set of values.
+    """
+
+    SCHEDULED = "scheduled"
+    CANCELLED = "cancelled"
+
+
+class ConcertSummary(BaseModel):
+    """Minimal read-only summary of a concert, for listing a venue's
+    concerts.
+
+    `title` is sourced from the concert's parent tour (`Concert` has no
+    title column of its own), matching the pattern used by
+    `SoldOutConcertRead`/`VenueConcertRead`. `status` is derived from
+    `is_cancelled` via its `validation_alias`, since `Concert` has no
+    separate status column.
+    """
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: int = Field(..., description="Unique concert identifier")
+    title: str = Field(
+        ..., validation_alias=AliasPath("tour", "name"), description="Title of the tour this concert belongs to"
+    )
+    venue_id: int = Field(..., description="ID of the venue hosting this concert")
+    start_datetime: datetime = Field(
+        ..., validation_alias="date_time", description="Concert start date and time"
+    )
+    status: ConcertStatus = Field(
+        ..., validation_alias="is_cancelled", description="Concert status, derived from `is_cancelled`"
+    )
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def derive_status_from_is_cancelled(cls, v):
+        """Map the model's `is_cancelled` boolean to a `ConcertStatus`."""
+        return ConcertStatus.CANCELLED if v else ConcertStatus.SCHEDULED
 
 
 class SoldOutConcertVenue(BaseModel):
