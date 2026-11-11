@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 
 from ..crud.venue import create_venue, get_venue_with_upcoming_concerts, venue_name_city_exists
 from ..database import get_db
+from ..schemas.concert import ConcertSummary
 from ..schemas.venue import VenueCreate, VenueDetailRead, VenueOut, VenueResponse
-from ..services.venue_service import list_venues
+from ..services.venue_service import get_venue_or_none, list_venue_concerts, list_venues
 
 router = APIRouter(prefix="/api/v1/venues", tags=["venues"])
 
@@ -68,3 +69,17 @@ def get_venue(venue_id: int, db: Session = Depends(get_db)):
         capacity=venue.capacity,
         upcoming_concerts=venue.concerts,
     )
+
+
+@router.get(
+    "/{venue_id}/concerts",
+    response_model=List[ConcertSummary],
+    summary="List a venue's non-cancelled concerts, soonest first",
+)
+def get_venue_concerts(venue_id: int, db: Session = Depends(get_db)):
+    """Retrieve every non-cancelled concert for a venue, ordered
+    soonest-first. Raises 404 when `venue_id` does not exist; an existing
+    venue with no matching concerts returns an empty list."""
+    if get_venue_or_none(db, venue_id) is None:
+        raise HTTPException(status_code=404, detail="Venue not found")
+    return list_venue_concerts(db, venue_id)
