@@ -216,6 +216,20 @@ a {
   outline-offset: 1px;
 }
 
+.concert-search-indicator {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.htmx-indicator {
+  opacity: 0;
+}
+
+.htmx-request.htmx-indicator,
+.htmx-request .htmx-indicator {
+  opacity: 1;
+}
+
 .concert-search-select {
   width: 100%;
   max-width: 360px;
