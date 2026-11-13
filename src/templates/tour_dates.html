@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tour Dates</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+<body>
+<main class="tour-dates-page">
+    <h1>Tour Dates</h1>
+
+    <label class="tour-dates-show-past-label">
+        <input type="checkbox"
+               id="tour-dates-show-past-checkbox"
+               name="include_past"
+               value="true"
+               {% if include_past %}checked{% endif %}
+               hx-get="/tour-dates"
+               hx-trigger="change"
+               hx-target="#tour-date-list"
+               hx-swap="innerHTML">
+        Show past dates
+    </label>
+
+    <div id="tour-date-list" aria-label="Tour dates" aria-live="polite">
+        {% include "partials/tour_date_list.html" %}
+    </div>
+</main>
+</body>
+</html>
