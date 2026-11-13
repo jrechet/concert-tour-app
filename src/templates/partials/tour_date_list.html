@@ -1,0 +1,42 @@
+{#
+  Tour date list, shared by the full tour dates page (included inline on
+  first load) and the "Show past dates" HTMX toggle (returned standalone
+  by GET /tour-dates when the request carries the `HX-Request` header).
+  Never wraps itself in <html>/layout markup so it can be swapped in
+  directly. Read-only: it never issues a data-modifying HTMX request, so
+  it carries no CSRF token.
+
+  `tour_dates` is rendered in exactly the order `list_tour_dates` returns
+  it (upcoming ascending, then past descending) — no Jinja `sort` filter
+  here, so the DOM order always matches the API order. Since index 0 is
+  always the soonest upcoming concert when any exists, the `next-concert`
+  marker only ever needs `loop.first`.
+#}
+{% if tour_dates %}
+<div class="tour-date-list" role="list">
+    {% set past_section_started = false %}
+    {% for concert in tour_dates %}
+    {% set is_upcoming = concert.date_time >= reference_time %}
+    {% if include_past and not is_upcoming and not past_section_started %}
+    {% set past_section_started = true %}
+    <h2 class="tour-date-list-past-heading">Past dates</h2>
+    {% endif %}
+    {% set is_next_concert = is_upcoming and loop.first %}
+    <article class="tour-date-item{% if is_next_concert %} next-concert{% endif %}" role="listitem">
+        {% if is_next_concert %}
+        <span class="tour-date-badge-next" role="status">Next concert</span>
+        {% endif %}
+        <span class="tour-date-item-date">{{ concert.date_time.strftime('%b %d, %Y') }}</span>
+        <span class="tour-date-item-venue">{{ concert.venue.name|e }}, {{ concert.venue.city|e }}</span>
+        {% if concert.is_cancelled %}
+        <span class="cancellation-badge" role="status">Cancelled</span>
+        {% endif %}
+        {% if concert.notes %}
+        <p class="tour-date-item-notes">{{ concert.notes|e }}</p>
+        {% endif %}
+    </article>
+    {% endfor %}
+</div>
+{% else %}
+<p class="tour-date-list-empty">No tour dates scheduled yet.</p>
+{% endif %}
