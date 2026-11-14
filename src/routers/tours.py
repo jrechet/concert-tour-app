@@ -24,6 +24,7 @@ from ..schemas import (
     TourSpanRead,
     TourStatus,
     TourSummary,
+    TourSummaryRead,
     TourRevenue,
 )
 from ..services.calendar_service import build_tour_calendar
@@ -37,6 +38,7 @@ from ..services.tour_service import (
     get_tour_cities,
     get_tour_revenue,
     get_tour_span,
+    list_cancelled_tours,
     search_tours_by_artist,
     uncancel_tour,
 )
@@ -96,6 +98,15 @@ def search_tours_by_artist_endpoint(
 def get_sold_out_tours_endpoint(db: Session = Depends(get_db)):
     """Retrieve tours where every non-cancelled concert is sold out."""
     return get_sold_out_tours(db)
+
+
+@router.get("/cancelled", response_model=List[TourSummaryRead])
+def list_cancelled_tours_endpoint(db: Session = Depends(get_db)):
+    """Retrieve every cancelled tour with its concert count, ordered by
+    most recently started first. Returns an empty list when no tour is
+    cancelled.
+    """
+    return list_cancelled_tours(db)
 
 
 @router.get("/{tour_id}", response_model=TourResponse)
