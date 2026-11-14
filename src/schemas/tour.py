@@ -152,6 +152,18 @@ class SoldOutTourRead(BaseModel):
     status: Optional[str] = Field(None, description="Tour status")
 
 
+class TourSummaryRead(BaseModel):
+    """Schema for a single entry in the cancelled-tours listing, exposing
+    just the tour's name and its number of concerts."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = Field(..., description="Unique tour identifier")
+    name: str = Field(..., description="Tour name")
+    start_date: date = Field(..., description="Tour start date")
+    concert_count: int = Field(..., ge=0, description="Number of concerts on this tour")
+
+
 class TourSummary(BaseModel):
     """Schema for the tour summary API response."""
 

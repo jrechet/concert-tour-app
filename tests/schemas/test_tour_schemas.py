@@ -16,6 +16,7 @@ from src.schemas.tour import (
     TourCitiesResponse,
     TourCityOut,
     SoldOutTourRead,
+    TourSummaryRead,
 )
 
 
@@ -184,3 +185,43 @@ class TestSoldOutTourRead:
 
         assert "status" in dumped
         assert dumped["status"] is None
+
+
+class TestTourSummaryRead:
+    """Test cases for `TourSummaryRead`, the item schema for the
+    cancelled-tours listing."""
+
+    def test_valid_from_attributes_object(self):
+        """Builds from an ORM-like row/tuple object exposing `id`, `name`,
+        `start_date`, and `concert_count` attributes, via `from_attributes`."""
+
+        class Row:
+            id = 1
+            name = "World Tour 2024"
+            start_date = date(2024, 6, 1)
+            concert_count = 5
+
+        summary = TourSummaryRead.model_validate(Row())
+
+        assert summary.model_dump() == {
+            "id": 1,
+            "name": "World Tour 2024",
+            "start_date": date(2024, 6, 1),
+            "concert_count": 5,
+        }
+
+    def test_concert_count_zero_is_valid(self):
+        summary = TourSummaryRead(
+            id=1, name="Solo Tour", start_date=date(2024, 1, 1), concert_count=0
+        )
+        assert summary.concert_count == 0
+
+    def test_negative_concert_count_raises(self):
+        with pytest.raises(ValidationError):
+            TourSummaryRead(
+                id=1, name="Solo Tour", start_date=date(2024, 1, 1), concert_count=-1
+            )
+
+    def test_missing_name_raises(self):
+        with pytest.raises(ValidationError):
+            TourSummaryRead(id=1, start_date=date(2024, 1, 1), concert_count=0)
