@@ -148,3 +148,77 @@ class TestSoldOutConcertsEndpoint:
         response = client.get("/api/v1/concerts/sold-out")
         assert response.status_code == 200
         assert response.json() == []
+
+
+class TestConcertSoldOutFlagOnListAndDetail:
+    """Coverage for the `sold_out`/`tickets_remaining` fields on
+    `GET /api/v1/concerts` and `GET /api/v1/concerts/{id}`, derived from
+    `Concert.is_sold_out`/`Concert.tickets_remaining`."""
+
+    def test_list_concerts_200_includes_sold_out_flag(self, client, db_session):
+        venues = create_venues(db_session, count=2)
+        tour = create_tour(
+            db_session, "Listing Tour", "Test Artist",
+            REFERENCE_TIME.date(),
+            (REFERENCE_TIME + timedelta(days=10)).date(),
+            "active",
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=1, ticket_price="80.00", base_time=REFERENCE_TIME,
+            tickets_sold=venues[0].capacity,
+        )
+        create_concert(
+            db_session, tour, venues[1], day_offset=2, ticket_price="80.00", base_time=REFERENCE_TIME,
+            tickets_sold=0,
+        )
+
+        response = client.get("/api/v1/concerts")
+        assert response.status_code == 200
+        payload = response.json()
+        assert len(payload) == 2
+        for item in payload:
+            assert "sold_out" in item
+            assert "tickets_remaining" in item
+        assert {item["sold_out"] for item in payload} == {True, False}
+
+    def test_detail_200_sold_out_true_when_no_tickets_remain(self, client, db_session):
+        venue = create_venues(db_session, count=1)[0]
+        tour = create_tour(
+            db_session, "Sold Out Tour", "Test Artist",
+            REFERENCE_TIME.date(),
+            (REFERENCE_TIME + timedelta(days=10)).date(),
+            "active",
+        )
+        concert = create_concert(
+            db_session, tour, venue, day_offset=1, ticket_price="80.00", base_time=REFERENCE_TIME,
+            tickets_sold=venue.capacity,
+        )
+
+        response = client.get(f"/api/v1/concerts/{concert.id}")
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["sold_out"] is True
+        assert payload["tickets_remaining"] == 0
+
+    def test_detail_200_sold_out_false_when_tickets_remain(self, client, db_session):
+        venue = create_venues(db_session, count=1)[0]
+        tour = create_tour(
+            db_session, "Open Tour", "Test Artist",
+            REFERENCE_TIME.date(),
+            (REFERENCE_TIME + timedelta(days=10)).date(),
+            "active",
+        )
+        concert = create_concert(
+            db_session, tour, venue, day_offset=1, ticket_price="80.00", base_time=REFERENCE_TIME,
+            tickets_sold=venue.capacity - 1,
+        )
+
+        response = client.get(f"/api/v1/concerts/{concert.id}")
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["sold_out"] is False
+        assert payload["tickets_remaining"] == 1
+
+    def test_detail_404_for_unknown_concert(self, client):
+        response = client.get("/api/v1/concerts/999999")
+        assert response.status_code == 404
