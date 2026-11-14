@@ -1,11 +1,14 @@
-"""Unit tests for `update_ticket_price` and `clear_lineup`."""
+"""Unit tests for `update_ticket_price`, `clear_lineup`, and
+`list_concerts_for_artist`."""
 
 from datetime import datetime
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import event as sa_event
 
 from src.models import LineupEntry
+from src.services.concert_service import list_concerts_for_artist
 from src.services.concerts_service import (
     ConcertCancelledError,
     ConcertNotFoundError,
@@ -91,3 +94,91 @@ class TestClearLineup:
         assert db_session.query(LineupEntry).filter(LineupEntry.concert_id == concert.id).count() == 0
         db_session.refresh(concert)
         assert concert is not None
+
+
+def _create_concert(db_session, day_offset, is_cancelled=False, cancellation_reason=None):
+    """Persist a concert on its own tour/venue, for lineup-matching tests
+    where concerts must not share a tour/venue with each other."""
+    venue = create_venues(db_session, count=1)[0]
+    tour = create_tour(
+        db_session, "Neon Skyline World Tour", "Aurora Belle",
+        BASE_TIME.date(), BASE_TIME.date(), "active",
+    )
+    return create_concert(
+        db_session, tour, venue, day_offset=day_offset, ticket_price="80.00", base_time=BASE_TIME,
+        is_cancelled=is_cancelled, cancellation_reason=cancellation_reason,
+    )
+
+
+class TestListConcertsForArtist:
+    """Coverage for `list_concerts_for_artist`."""
+
+    def test_returns_concerts_sorted_by_date_ascending(self, db_session):
+        later_concert = _create_concert(db_session, day_offset=30)
+        soonest_concert = _create_concert(db_session, day_offset=5)
+        middle_concert = _create_concert(db_session, day_offset=10)
+        for concert in (later_concert, soonest_concert, middle_concert):
+            _add_lineup_entry(db_session, concert, artist_name="Nova Rae", set_order=1)
+
+        result = list_concerts_for_artist(db_session, "Nova Rae")
+
+        assert [concert.id for concert in result] == [
+            soonest_concert.id, middle_concert.id, later_concert.id,
+        ]
+
+    def test_excludes_cancelled_concerts(self, db_session):
+        cancelled_concert = _create_concert(
+            db_session, day_offset=5, is_cancelled=True, cancellation_reason="Artist illness",
+        )
+        active_concert = _create_concert(db_session, day_offset=10)
+        _add_lineup_entry(db_session, cancelled_concert, artist_name="Nova Rae", set_order=1)
+        _add_lineup_entry(db_session, active_concert, artist_name="Nova Rae", set_order=1)
+
+        result = list_concerts_for_artist(db_session, "Nova Rae")
+
+        returned_ids = [concert.id for concert in result]
+        assert returned_ids == [active_concert.id]
+        assert cancelled_concert.id not in returned_ids
+
+    def test_excludes_concerts_without_the_artist_in_lineup(self, db_session):
+        with_artist = _create_concert(db_session, day_offset=5)
+        without_artist = _create_concert(db_session, day_offset=10)
+        _add_lineup_entry(db_session, with_artist, artist_name="Nova Rae", set_order=1)
+        _add_lineup_entry(db_session, without_artist, artist_name="Opening Act", set_order=1)
+
+        result = list_concerts_for_artist(db_session, "Nova Rae")
+
+        returned_ids = [concert.id for concert in result]
+        assert returned_ids == [with_artist.id]
+        assert without_artist.id not in returned_ids
+
+    def test_returns_empty_list_when_artist_has_no_concerts(self, db_session):
+        concert = _create_concert(db_session, day_offset=5)
+        _add_lineup_entry(db_session, concert, artist_name="Opening Act", set_order=1)
+
+        result = list_concerts_for_artist(db_session, "Nova Rae")
+
+        assert result == []
+
+    def test_venue_and_city_are_loaded_without_extra_query(self, db_session):
+        concert = _create_concert(db_session, day_offset=5)
+        _add_lineup_entry(db_session, concert, artist_name="Nova Rae", set_order=1)
+        expected_city = concert.venue.city
+        db_session.expire_all()
+
+        queries = []
+        engine = db_session.get_bind()
+
+        def _record(conn, cursor, statement, parameters, context, executemany):
+            queries.append(statement)
+
+        sa_event.listen(engine, "before_cursor_execute", _record)
+        try:
+            result = list_concerts_for_artist(db_session, "Nova Rae")
+            cities = [concert.venue.city for concert in result]
+        finally:
+            sa_event.remove(engine, "before_cursor_execute", _record)
+
+        select_queries = [q for q in queries if q.strip().upper().startswith("SELECT")]
+        assert len(select_queries) == 1
+        assert cities == [expected_city]
