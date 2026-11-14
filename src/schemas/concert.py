@@ -423,6 +423,33 @@ class ConcertSummary(BaseModel):
         return ConcertStatus.CANCELLED if v else ConcertStatus.SCHEDULED
 
 
+class ConcertVenueRead(BaseModel):
+    """Minimal venue details embedded in `ArtistConcertRead`."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = Field(..., description="Unique venue identifier")
+    name: str = Field(..., description="Venue name")
+    city: str = Field(..., description="City the venue is located in")
+
+
+class ArtistConcertRead(BaseModel):
+    """Read-only schema for a concert nested under `GET /api/v1/artists/{id}/concerts`.
+
+    `date` is sourced from the `Concert.date_time` column via
+    `validation_alias`, since `Concert` has no separate `date` column.
+    Deliberately excludes `is_cancelled`/`cancellation_reason`: filtering
+    out cancelled concerts is the endpoint's responsibility, not this
+    schema's.
+    """
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: int = Field(..., description="Unique concert identifier")
+    date: datetime = Field(..., validation_alias="date_time", description="Concert date and time")
+    venue: ConcertVenueRead = Field(..., description="Venue hosting this concert")
+
+
 class SoldOutConcertVenue(BaseModel):
     """Minimal venue summary embedded in `SoldOutConcertRead`."""
 
