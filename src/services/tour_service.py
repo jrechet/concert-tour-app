@@ -10,7 +10,13 @@ from sqlalchemy.orm import Session
 from ..config import MAX_ARTIST_SEARCH_RESULTS, TOUR_COPY_NAME_SUFFIX
 from ..database import get_reference_time
 from ..models import Concert, Tour, Venue
-from ..schemas.tour import OCCUPANCY_PERCENTAGE_PRECISION, TourCityOut, TourOccupancySchema, TourStatus
+from ..schemas.tour import (
+    OCCUPANCY_PERCENTAGE_PRECISION,
+    TourCityOut,
+    TourOccupancySchema,
+    TourStatus,
+    TourSummaryRead,
+)
 
 # Not a `TourStatus` member: that enum is reserved for the statuses accepted
 # by `GET /tours`'s `status` query filter, and "cancelled" isn't one of them
@@ -271,6 +277,36 @@ def uncancel_tour(db: Session, tour_id: int) -> Tour:
     db.commit()
     db.refresh(tour)
     return tour
+
+
+def list_cancelled_tours(db: Session) -> List[TourSummaryRead]:
+    """Return every cancelled tour paired with its total concert count.
+
+    Uses a single outer-joined, grouped query so a cancelled tour with zero
+    concerts is still returned, with `concert_count` of 0, rather than being
+    dropped by an inner join. Results are ordered by `start_date` descending
+    (most recently started first), with `id` descending as a stable
+    tiebreaker for tours sharing a `start_date`. Returns an empty list when
+    no tour is cancelled.
+    """
+    rows = (
+        db.query(Tour, func.count(Concert.id).label("concert_count"))
+        .outerjoin(Concert, Concert.tour_id == Tour.id)
+        .filter(Tour.status == CANCELLED_TOUR_STATUS)
+        .group_by(Tour.id)
+        .order_by(Tour.start_date.desc(), Tour.id.desc())
+        .all()
+    )
+
+    return [
+        TourSummaryRead(
+            id=tour.id,
+            name=tour.name,
+            start_date=tour.start_date,
+            concert_count=concert_count,
+        )
+        for tour, concert_count in rows
+    ]
 
 
 def get_sold_out_tours(db: Session) -> List[Tour]:
