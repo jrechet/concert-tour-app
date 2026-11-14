@@ -22,12 +22,12 @@
     {% if concert.is_cancelled and concert.cancellation_reason %}
     <p class="cancellation-reason">{{ concert.cancellation_reason|e }}</p>
     {% endif %}
-    {% if concert.sold_out %}
-    <span class="ticket-badge ticket-badge-sold-out" role="status">Sold Out</span>
+    {% if concert.is_sold_out %}
+    <span class="badge badge-sold-out" data-testid="sold-out-badge" role="status" aria-label="Sold out">Sold Out</span>
     {% elif concert.is_almost_sold_out %}
     <span class="ticket-badge ticket-badge-almost-sold-out" role="status">{{ "Almost sold out!"|e }}</span>
     {% endif %}
-    {% if not concert.sold_out and concert.remaining_tickets is not none %}
+    {% if not concert.is_sold_out and concert.remaining_tickets is not none %}
     <span class="ticket-count">{{ concert.remaining_tickets }} tickets left</span>
     {% endif %}
     {% if concert.percentage_sold is not none %}
