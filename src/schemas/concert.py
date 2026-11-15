@@ -198,6 +198,35 @@ class ConcertReschedule(BaseModel):
         return v
 
 
+def _now_utc() -> datetime:
+    """Single source of truth for "now" when validating `date_time` fields
+    below, so tests can monkeypatch this function instead of sleeping."""
+    return datetime.now(timezone.utc)
+
+
+class ConcertDuplicateRequest(BaseModel):
+    """Schema for the request body of the duplicate-concert endpoint.
+
+    Rejects a `date_time` strictly before now; "now" itself is accepted.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"date_time": "2024-08-01T20:00:00+00:00"}},
+    )
+
+    date_time: datetime = Field(..., description="Date and time for the duplicated concert")
+
+    @field_validator("date_time")
+    @classmethod
+    def validate_not_in_past(cls, v: datetime) -> datetime:
+        """Reject a `date_time` in the past, comparing naive input as if
+        it were UTC without altering the value returned to the caller."""
+        comparable = v if v.tzinfo is not None else v.replace(tzinfo=timezone.utc)
+        if comparable < _now_utc():
+            raise ValueError("date_time must not be in the past")
+        return v
+
+
 class ConcertNotesUpdate(BaseModel):
     """Schema for the request body of the update-concert-notes endpoint."""
 
