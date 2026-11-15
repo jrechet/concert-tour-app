@@ -32,9 +32,15 @@ class LineupEntry(Base):
 
     @validates("set_order")
     def validate_set_order(self, key, value):
-        """Reject a negative running-order position."""
-        if value is not None and value < 0:
-            raise ValueError("set_order cannot be negative")
+        """Reject a running-order position below 1.
+
+        `set_order` is 1-based (matching `MIN_SET_ORDER` in
+        `lineup_service` and the `ge=1`/`gt=0` schemas in
+        `schemas/lineup.py` and `schemas/lineup_act.py`), so 0 and negative
+        values are both invalid.
+        """
+        if value is not None and value < 1:
+            raise ValueError("set_order must be at least 1")
         return value
 
 
