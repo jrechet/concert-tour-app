@@ -373,6 +373,33 @@ class CancellationStats(BaseModel):
         }
 
 
+class YearStats(BaseModel):
+    """Concert, cancellation and ticket-sales totals for a single calendar year."""
+
+    year: int = Field(..., description="Calendar year")
+    concerts: int = Field(..., ge=0, description="Total concerts in this year")
+    cancelled: int = Field(..., ge=0, description="Cancelled concerts in this year")
+    tickets_sold: int = Field(..., ge=0, description="Total tickets sold across this year's concerts")
+
+    @model_validator(mode="after")
+    def validate_cancelled_not_exceeding_concerts(self) -> "YearStats":
+        """Reject a cancelled count that exceeds the total concert count."""
+        if self.cancelled > self.concerts:
+            raise ValueError("cancelled cannot exceed concerts")
+        return self
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "year": 2026,
+                "concerts": 42,
+                "cancelled": 3,
+                "tickets_sold": 15000,
+            }
+        }
+
+
 # Kept as an alias so the existing cancellation stats router/service (out of
 # this schema change's scope) keep working under their original import name.
 CancellationStatsResponse = CancellationStats
