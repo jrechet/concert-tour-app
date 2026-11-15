@@ -2,11 +2,11 @@
 plus the concert duplication service."""
 
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from sqlalchemy.orm import Session, joinedload
 
-from ..models import Concert, LineupEntry
+from ..models import Concert, ConcertStatus, LineupEntry
 from .concerts_service import ConcertNotFoundError
 
 
@@ -45,6 +45,28 @@ def get_headliner(db: Session, concert_id: int) -> LineupEntry:
         raise EmptyLineupError(f"Concert {concert_id} has no lineup entries")
 
     return headliner
+
+
+def cancel_concert(db: Session, concert_id: int) -> Optional[Concert]:
+    """Cancel `concert_id`, idempotently.
+
+    Returns `None` when no concert with `concert_id` exists, leaving the
+    HTTP-error decision to the router. When the concert is `scheduled`,
+    flips its `status` to `ConcertStatus.cancelled` and commits. When it
+    is already `cancelled`, returns it untouched -- no write, no commit --
+    so a repeated call is a true no-op rather than a second database hit.
+    """
+    concert = db.query(Concert).filter(Concert.id == concert_id).first()
+    if concert is None:
+        return None
+
+    if concert.status == ConcertStatus.cancelled:
+        return concert
+
+    concert.status = ConcertStatus.cancelled
+    db.commit()
+    db.refresh(concert)
+    return concert
 
 
 def list_concerts_for_artist(db: Session, artist_id: str) -> List[Concert]:
