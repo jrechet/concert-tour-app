@@ -2,7 +2,7 @@
 
 from typing import List
 
-from sqlalchemy import func
+from sqlalchemy import Integer, func
 from sqlalchemy.orm import Session
 
 from ..models import Concert, Tour
@@ -11,6 +11,7 @@ from ..schemas.stats import (
     CancellationStatsResponse,
     MonthlyRevenue,
     TourCancellationCount,
+    YearStats,
 )
 
 
@@ -91,3 +92,34 @@ def get_cancellation_stats(db: Session) -> CancellationStatsResponse:
         cancellation_rate=cancellation_rate,
         by_tour=by_tour,
     )
+
+
+def get_concerts_per_year(db: Session) -> List[YearStats]:
+    """Return per-year concert, cancellation, and ticket-sales totals.
+
+    Only years with at least one concert appear, ordered oldest first.
+    `tickets_sold` sums the existing `Concert.tickets_sold` column (the
+    source of truth used elsewhere, e.g. `get_revenue_by_month`), coalesced
+    to 0 since `SUM` returns `NULL` for a year with no tickets sold.
+    """
+    year = func.extract("year", Concert.date_time)
+    rows = (
+        db.query(
+            year.label("year"),
+            func.count(Concert.id).label("concerts"),
+            func.sum(func.cast(Concert.is_cancelled, Integer)).label("cancelled"),
+            func.coalesce(func.sum(Concert.tickets_sold), 0).label("tickets_sold"),
+        )
+        .group_by(year)
+        .order_by(year)
+        .all()
+    )
+    return [
+        YearStats(
+            year=int(row.year),
+            concerts=row.concerts,
+            cancelled=int(row.cancelled or 0),
+            tickets_sold=int(row.tickets_sold or 0),
+        )
+        for row in rows
+    ]
