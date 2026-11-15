@@ -400,6 +400,24 @@ class YearStats(BaseModel):
         }
 
 
+class BusiestVenue(BaseModel):
+    """Number of non-cancelled concerts hosted by a single venue."""
+
+    name: str = Field(..., description="Venue name")
+    city: str = Field(..., description="Venue city")
+    concert_count: int = Field(..., ge=0, description="Number of non-cancelled concerts hosted by this venue")
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "name": "Madison Square Garden",
+                "city": "New York",
+                "concert_count": 8,
+            }
+        }
+
+
 # Kept as an alias so the existing cancellation stats router/service (out of
 # this schema change's scope) keep working under their original import name.
 CancellationStatsResponse = CancellationStats

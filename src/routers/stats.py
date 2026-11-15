@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db, get_reference_time
 from ..schemas import (
     ArtistConcertCount,
+    BusiestVenue,
     CancellationStatsResponse,
     CapacityStats,
     CitiesResponse,
@@ -30,6 +31,7 @@ from ..schemas import (
 from ..services.stats import get_cancellation_stats, get_concerts_per_year, get_revenue_by_month
 from ..services.stats_service import (
     count_concerts_per_artist,
+    get_busiest_venues,
     get_capacity_stats,
     get_concert_count,
     get_concert_counts_by_country,
@@ -198,3 +200,15 @@ def get_years_stats(db: Session = Depends(get_db)):
     Returns 200 with an empty list (not an error) when there is no data.
     """
     return get_concerts_per_year(db)
+
+
+@router.get("/venues/busiest", response_model=List[BusiestVenue], status_code=200)
+def get_busiest_venues_stats(db: Session = Depends(get_db)):
+    """Retrieve the venues with the most non-cancelled concerts, ordered by
+    concert count descending (ties broken alphabetically by name), capped
+    at 5 entries.
+
+    Returns 200 with an empty list (not an error) when there is no venue
+    with a non-cancelled concert.
+    """
+    return get_busiest_venues(db)
