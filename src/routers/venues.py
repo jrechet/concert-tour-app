@@ -3,14 +3,22 @@
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..crud.venue import create_venue, get_venue_with_upcoming_concerts, venue_name_city_exists
 from ..database import get_db
 from ..schemas.concert import ConcertSummary
-from ..schemas.venue import VenueCreate, VenueDetailRead, VenueOut, VenueResponse
-from ..services.venue_service import get_venue_or_none, list_venue_concerts, list_venues
+from ..schemas.venue import VenueCreate, VenueDeleteConflict, VenueDetailRead, VenueOut, VenueResponse
+from ..services.venue_service import (
+    VenueHasConcertsError,
+    VenueNotFoundError,
+    delete_venue,
+    get_venue_or_none,
+    list_venue_concerts,
+    list_venues,
+)
 
 router = APIRouter(prefix="/api/v1/venues", tags=["venues"])
 
@@ -69,6 +77,30 @@ def get_venue(venue_id: int, db: Session = Depends(get_db)):
         capacity=venue.capacity,
         upcoming_concerts=venue.concerts,
     )
+
+
+@router.delete(
+    "/{venue_id}",
+    status_code=204,
+    responses={
+        204: {"description": "Venue deleted"},
+        404: {"description": "Venue not found"},
+        409: {"model": VenueDeleteConflict, "description": "Venue still hosts concerts"},
+    },
+)
+def delete_venue_route(venue_id: int, db: Session = Depends(get_db)):
+    """Delete a venue. Raises 404 when `venue_id` does not exist, or 409
+    when the venue still hosts at least one concert."""
+    try:
+        delete_venue(db, venue_id)
+    except VenueNotFoundError:
+        raise HTTPException(status_code=404, detail="Venue not found")
+    except VenueHasConcertsError as exc:
+        conflict = VenueDeleteConflict(
+            detail=f"Venue {venue_id} still hosts {exc.concert_count} concert(s)",
+            concert_count=exc.concert_count,
+        )
+        return JSONResponse(status_code=409, content=conflict.model_dump())
 
 
 @router.get(
