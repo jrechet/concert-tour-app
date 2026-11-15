@@ -5,7 +5,7 @@ Pydantic schemas for Venue entities.
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import AliasPath, BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasPath, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .tour import TourStatus
 
@@ -27,6 +27,35 @@ class VenueCreate(BaseModel):
         if not v.strip():
             raise ValueError("name must not be empty or whitespace")
         return v
+
+
+class VenueUpdate(BaseModel):
+    """Schema for the request body of `PATCH /api/v1/venues/{id}`.
+
+    Every field is optional so any subset may be sent, but at least one must
+    actually be set: an entirely empty/null body is rejected so a no-op PATCH
+    doesn't silently return 200.
+    """
+
+    name: Optional[str] = Field(None, min_length=1, description="Venue name")
+    city: Optional[str] = Field(None, description="City the venue is located in")
+    country: Optional[str] = Field(None, description="Country the venue is located in")
+    capacity: Optional[int] = Field(None, gt=MIN_VENUE_CAPACITY, description="Venue capacity")
+
+    @field_validator("name")
+    @classmethod
+    def name_must_not_be_blank(cls, v: Optional[str]) -> Optional[str]:
+        """Reject a whitespace-only name, while still allowing `None` (field omitted)."""
+        if v is not None and not v.strip():
+            raise ValueError("name must not be empty or whitespace")
+        return v
+
+    @model_validator(mode="after")
+    def at_least_one_field_must_be_set(self) -> "VenueUpdate":
+        """Reject a body where every field is omitted or null."""
+        if self.name is None and self.city is None and self.country is None and self.capacity is None:
+            raise ValueError("at least one field must be provided")
+        return self
 
 
 class VenueRead(BaseModel):

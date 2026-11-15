@@ -16,6 +16,7 @@ pre-check via a query rather than depending on the ORM to raise
 """
 
 from sqlalchemy import Column, Integer, String
+from sqlalchemy.orm import validates
 
 from ..database import Base
 
@@ -30,3 +31,26 @@ class Venue(Base):
     city = Column(String(100), nullable=False)
     country = Column(String(100), nullable=False)
     capacity = Column(Integer, nullable=True)
+
+    @validates("name")
+    def validate_name(self, key, value):
+        """Reject an empty or whitespace-only name, mirroring `VenueCreate`/`VenueUpdate`."""
+        if value is None or not value.strip():
+            raise ValueError("name must not be empty or whitespace")
+        return value
+
+    @validates("capacity")
+    def validate_capacity(self, key, value):
+        """Reject a negative capacity.
+
+        `VenueCreate`/`VenueUpdate` require `capacity > 0` for anything
+        coming through the API, but `0` is kept valid here at the model
+        level: it's an established edge case elsewhere in the codebase
+        (e.g. sold-out/occupancy calculations guard against a zero-capacity
+        venue rather than treating it as invalid data - see
+        `tests/services/test_occupancy.py::test_zero_total_capacity_returns_zero_percentage`).
+        `None` is also allowed through since the column is nullable.
+        """
+        if value is not None and value < 0:
+            raise ValueError("capacity must not be negative")
+        return value
