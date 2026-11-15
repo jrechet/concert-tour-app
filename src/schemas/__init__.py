@@ -84,6 +84,7 @@ from .stats import (
     CancellationStatsResponse,
     CANCELLATION_RATE_PRECISION,
     YearStats,
+    BusiestVenue,
 )
 
 __all__ = [
@@ -167,4 +168,5 @@ __all__ = [
     "CancellationStatsResponse",
     "CANCELLATION_RATE_PRECISION",
     "YearStats",
+    "BusiestVenue",
 ]
