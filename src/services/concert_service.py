@@ -15,6 +15,38 @@ class VenueScheduleConflictError(Exception):
     already exists at the source's venue for the requested `date_time`."""
 
 
+class EmptyLineupError(Exception):
+    """Raised by `get_headliner` when `concert_id` identifies a real
+    concert whose lineup has no acts, distinguishing it from an unknown
+    concert (`ConcertNotFoundError`)."""
+
+
+def get_headliner(db: Session, concert_id: int) -> LineupEntry:
+    """Return the headlining act of `concert_id`'s lineup: the entry with
+    the greatest `set_order`, not merely the first row the database
+    happens to emit.
+
+    Raises `ConcertNotFoundError` when no concert with `concert_id`
+    exists. Raises `EmptyLineupError` when the concert exists but its
+    lineup is empty. Raises no HTTP-related errors; turning these into
+    response codes is the caller's responsibility.
+    """
+    concert_exists = db.query(Concert.id).filter(Concert.id == concert_id).first()
+    if not concert_exists:
+        raise ConcertNotFoundError(f"Concert {concert_id} not found")
+
+    headliner = (
+        db.query(LineupEntry)
+        .filter(LineupEntry.concert_id == concert_id)
+        .order_by(LineupEntry.set_order.desc())
+        .first()
+    )
+    if headliner is None:
+        raise EmptyLineupError(f"Concert {concert_id} has no lineup entries")
+
+    return headliner
+
+
 def list_concerts_for_artist(db: Session, artist_id: str) -> List[Concert]:
     """Return every non-cancelled concert on whose lineup `artist_id`
     appears, ordered soonest first.

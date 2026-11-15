@@ -46,6 +46,7 @@ from .concert import (
     SoldOutConcertVenue,
     TicketPriceUpdate,
 )
+from .headliner import HeadlinerResponse
 from .tour_date import TourDateResponse, TourDateSort
 from .venue import VenueConcertRead, VenueCreate, VenueDetailRead, VenueRead, VenueResponse
 from .lineup_entry import LineupEntryResponse
@@ -128,6 +129,7 @@ __all__ = [
     "NextConcertVenue",
     "NextConcertCity",
     "TicketPriceUpdate",
+    "HeadlinerResponse",
     "TourDateResponse",
     "TourDateSort",
     "LineupEntryResponse",
