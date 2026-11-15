@@ -25,8 +25,9 @@ from ..schemas import (
     WEEKDAY_NAMES,
     WeekdayCount,
     WeekdayStatsResponse,
+    YearStats,
 )
-from ..services.stats import get_cancellation_stats, get_revenue_by_month
+from ..services.stats import get_cancellation_stats, get_concerts_per_year, get_revenue_by_month
 from ..services.stats_service import (
     count_concerts_per_artist,
     get_capacity_stats,
@@ -187,3 +188,13 @@ def get_cancellations_stats(db: Session = Depends(get_db)):
     error) when there is no data.
     """
     return get_cancellation_stats(db)
+
+
+@router.get("/years", response_model=List[YearStats], status_code=200)
+def get_years_stats(db: Session = Depends(get_db)):
+    """Retrieve per-year concert, cancellation, and ticket-sales totals,
+    ordered oldest year first.
+
+    Returns 200 with an empty list (not an error) when there is no data.
+    """
+    return get_concerts_per_year(db)
