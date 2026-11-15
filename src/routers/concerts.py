@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..config import CITY_SEARCH_DEBOUNCE_MS, DEFAULT_PAGE_SIZE, LOW_STOCK_THRESHOLD, MAX_PAGE_SIZE
 from ..database import get_db, get_reference_time
-from ..models import Concert, LineupEntry, Tour, Venue
+from ..models import Concert, LineupEntry, TicketTier, Tour, Venue
 from ..schemas import (
     CancelConcertRequest,
     ConcertDateRangeQuery,
@@ -37,6 +37,7 @@ from ..schemas import (
     SoldOutConcertRead,
     TicketPriceUpdate,
     TicketPurchaseRequest,
+    TicketTierRead,
 )
 from ..services.concerts_service import (
     MAX_CITY_QUERY_LENGTH,
@@ -778,6 +779,36 @@ def get_concert_occupancy_endpoint(concert_id: int, db: Session = Depends(get_db
     if occupancy is None:
         raise HTTPException(status_code=404, detail="Concert not found")
     return occupancy
+
+
+@api_router.get(
+    "/{concert_id}/tiers",
+    response_model=List[TicketTierRead],
+    status_code=200,
+    responses={
+        404: {
+            "description": "No concert exists with the given `concert_id`.",
+            "content": {"application/json": {"example": {"detail": "Concert not found"}}},
+        },
+    },
+)
+def get_concert_tiers(concert_id: int, db: Session = Depends(get_db)):
+    """Retrieve the ticket tiers for a concert, cheapest first.
+
+    Returns 404 when the concert itself doesn't exist, but an empty list
+    (not an error) when the concert exists and simply has no tiers. Equal
+    prices break ties by `id` so the order is stable.
+    """
+    concert_exists = db.query(Concert.id).filter(Concert.id == concert_id).first()
+    if not concert_exists:
+        raise HTTPException(status_code=404, detail="Concert not found")
+
+    return (
+        db.query(TicketTier)
+        .filter(TicketTier.concert_id == concert_id)
+        .order_by(TicketTier.price, TicketTier.id)
+        .all()
+    )
 
 
 @router.get("/concerts")
