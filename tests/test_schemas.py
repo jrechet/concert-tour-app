@@ -189,6 +189,7 @@ class TestConcertSchemas:
             "is_sold_out": False,
             "is_almost_sold_out": False,
             "is_cancelled": False,
+            "status": "scheduled",
             "days_until_concert": 30
         }
         concert_response = ConcertResponse(**concert_data)
@@ -214,6 +215,7 @@ class TestConcertSchemas:
             "is_sold_out": True,
             "is_almost_sold_out": True,
             "is_cancelled": False,
+            "status": "scheduled",
             "days_until_concert": 30
         }
         concert_response = ConcertResponse(**concert_data)
@@ -236,6 +238,7 @@ class TestConcertSchemas:
             "is_sold_out": False,
             "is_almost_sold_out": False,
             "is_cancelled": False,
+            "status": "scheduled",
             "days_until_concert": 30
         }
         concert_response = ConcertResponse(**concert_data)

@@ -198,4 +198,5 @@ class TestUpcomingConcerts:
             "is_cancelled",
             "cancellation_reason",
             "notes",
+            "status",
         }
