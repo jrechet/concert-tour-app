@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db, get_reference_time
 from ..schemas import (
     ArtistConcertCount,
+    CancellationStatsResponse,
     CapacityStats,
     CitiesResponse,
     CityRevenue,
@@ -25,7 +26,7 @@ from ..schemas import (
     WeekdayCount,
     WeekdayStatsResponse,
 )
-from ..services.stats import get_revenue_by_month
+from ..services.stats import get_cancellation_stats, get_revenue_by_month
 from ..services.stats_service import (
     count_concerts_per_artist,
     get_capacity_stats,
@@ -176,3 +177,13 @@ def get_weekdays_stats(db: Session = Depends(get_db)):
     return WeekdayStatsResponse(
         weekdays=[WeekdayCount(weekday=name, count=counts[name]) for name in WEEKDAY_NAMES]
     )
+
+
+@router.get("/cancellations", response_model=CancellationStatsResponse, status_code=200)
+def get_cancellations_stats(db: Session = Depends(get_db)):
+    """Retrieve overall and per-tour concert cancellation statistics.
+
+    Returns 200 with all-zero counts and an empty `by_tour` list (not an
+    error) when there is no data.
+    """
+    return get_cancellation_stats(db)
