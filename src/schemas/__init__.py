@@ -58,6 +58,7 @@ from .lineup import (
 from .lineup_act import LineupActCreate, LineupActRead
 from .occupancy import OccupancyResponse
 from .ticket import RefundRequest, TicketPurchaseRequest
+from .ticket_tier import TicketTierRead
 from .stats import (
     CitiesResponse,
     VenuesResponse,
@@ -137,6 +138,7 @@ __all__ = [
     "OccupancyResponse",
     "TicketPurchaseRequest",
     "RefundRequest",
+    "TicketTierRead",
     "CitiesResponse",
     "VenuesResponse",
     "CountResponse",
