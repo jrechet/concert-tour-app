@@ -1,10 +1,25 @@
 """SQLAlchemy model for Concert entity."""
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, Numeric, String, event
+import enum
+
+from sqlalchemy import Boolean, Column, DateTime, Enum as SAEnum, ForeignKey, Index, Integer, Numeric, String, event
 from sqlalchemy.orm import relationship, validates
 
 from ..config import ALMOST_SOLD_OUT_THRESHOLD
 from ..database import Base, get_reference_time
+
+
+class ConcertStatus(str, enum.Enum):
+    """Lifecycle status for a `Concert`.
+
+    The single source of truth for valid status values: the model's
+    `status` column, the `migrations/versions/*_add_concert_status.py`
+    migration, and `src.schemas.concert` all reuse this enum rather than
+    duplicating the `scheduled`/`cancelled` string literals.
+    """
+
+    scheduled = "scheduled"
+    cancelled = "cancelled"
 
 
 class Concert(Base):
@@ -25,6 +40,17 @@ class Concert(Base):
     cancellation_reason = Column(String(500), nullable=True)
     cancelled_with_tour = Column(Boolean, nullable=False, default=False, server_default="0")
     notes = Column(String(500), nullable=True, default=None)
+    status = Column(
+        SAEnum(
+            ConcertStatus,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+            native_enum=False,
+            name="concert_status",
+        ),
+        nullable=False,
+        default=ConcertStatus.scheduled,
+        server_default=ConcertStatus.scheduled.value,
+    )
 
     tour = relationship("Tour", backref="concerts")
     venue = relationship("Venue", backref="concerts")
@@ -52,6 +78,18 @@ class Concert(Base):
         if self.venue is not None and self.venue.capacity is not None and value > self.venue.capacity:
             raise ValueError("tickets_sold cannot exceed venue capacity")
         return value
+
+    @validates("status")
+    def validate_status(self, key, value):
+        """Coerce a plain string to `ConcertStatus`, rejecting any value
+        that isn't a known member, immediately rather than at flush time.
+        """
+        if isinstance(value, ConcertStatus):
+            return value
+        try:
+            return ConcertStatus(value)
+        except ValueError as exc:
+            raise ValueError(f"Invalid concert status: {value!r}") from exc
 
     @property
     def venue_name(self):

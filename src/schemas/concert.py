@@ -4,10 +4,11 @@ Pydantic schemas for Concert entities.
 
 import os
 from datetime import date, datetime, timedelta, timezone
-from enum import Enum
 from typing import Optional
 from pydantic import AliasPath, BaseModel, ConfigDict, Field, field_validator, model_validator, root_validator, validator
 from decimal import Decimal
+
+from ..models.concert import ConcertStatus
 
 RESCHEDULE_CLOCK_SKEW_TOLERANCE_SECONDS = float(
     os.getenv("CONCERT_RESCHEDULE_CLOCK_SKEW_TOLERANCE_SECONDS", "0")
@@ -381,6 +382,7 @@ class ConcertResponse(BaseModel):
     notes: Optional[str] = Field(
         None, max_length=MAX_NOTES_LENGTH, description="Free-text notes about this concert; null when none have been added"
     )
+    status: ConcertStatus = Field(..., description="Concert lifecycle status")
 
     class Config:
         """Pydantic configuration."""
@@ -403,21 +405,10 @@ class ConcertResponse(BaseModel):
                 "is_almost_sold_out": True,
                 "is_cancelled": False,
                 "cancellation_reason": None,
-                "notes": None
+                "notes": None,
+                "status": "scheduled"
             }
         }
-
-
-class ConcertStatus(str, Enum):
-    """Derived status for a concert.
-
-    `Concert` has no `status` column of its own (cancellation is tracked
-    via the `is_cancelled` boolean), so this enum exists purely to give
-    `ConcertSummary.status` a non-hardcoded set of values.
-    """
-
-    SCHEDULED = "scheduled"
-    CANCELLED = "cancelled"
 
 
 class ConcertSummary(BaseModel):
@@ -427,8 +418,9 @@ class ConcertSummary(BaseModel):
     `title` is sourced from the concert's parent tour (`Concert` has no
     title column of its own), matching the pattern used by
     `SoldOutConcertRead`/`VenueConcertRead`. `status` is derived from
-    `is_cancelled` via its `validation_alias`, since `Concert` has no
-    separate status column.
+    `is_cancelled` via its `validation_alias`, matching this endpoint's
+    existing contract (unlike `ConcertResponse.status`, which reads the
+    model's own `status` column directly).
     """
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
@@ -449,7 +441,7 @@ class ConcertSummary(BaseModel):
     @classmethod
     def derive_status_from_is_cancelled(cls, v):
         """Map the model's `is_cancelled` boolean to a `ConcertStatus`."""
-        return ConcertStatus.CANCELLED if v else ConcertStatus.SCHEDULED
+        return ConcertStatus.cancelled if v else ConcertStatus.scheduled
 
 
 class ConcertVenueRead(BaseModel):
