@@ -18,7 +18,6 @@ from ..config import CITY_SEARCH_DEBOUNCE_MS, DEFAULT_PAGE_SIZE, LOW_STOCK_THRES
 from ..database import get_db, get_reference_time
 from ..models import Concert, LineupEntry, TicketTier, Tour, Venue
 from ..schemas import (
-    CancelConcertRequest,
     ConcertDateRangeQuery,
     ConcertDuplicateRequest,
     ConcertNextResponse,
@@ -60,7 +59,13 @@ from ..services.concerts_service import (
     update_ticket_price,
 )
 from ..services.concerts_service import get_upcoming_concerts as fetch_upcoming_concerts
-from ..services.concert_service import EmptyLineupError, VenueScheduleConflictError, duplicate_concert, get_headliner
+from ..services.concert_service import (
+    EmptyLineupError,
+    VenueScheduleConflictError,
+    cancel_concert,
+    duplicate_concert,
+    get_headliner,
+)
 from ..services.lineup_service import (
     LineupEntryNotFoundError,
     clear_lineup,
@@ -492,23 +497,27 @@ def update_concert_notes(concert_id: int, payload: ConcertNotesUpdate, db: Sessi
     return concert
 
 
-@api_router.post("/{concert_id}/cancel", response_model=ConcertResponse)
-def cancel_concert(concert_id: int, payload: CancelConcertRequest, db: Session = Depends(get_db)):
-    """Cancel a concert, recording the reason.
+@api_router.post(
+    "/{concert_id}/cancel",
+    response_model=ConcertResponse,
+    responses={
+        404: {
+            "description": "No concert exists with the given `concert_id`.",
+            "content": {"application/json": {"example": {"detail": "Concert not found"}}},
+        },
+    },
+)
+def cancel_concert_endpoint(concert_id: int, db: Session = Depends(get_db)):
+    """Cancel a concert, idempotently.
 
-    Returns 404 for an unknown concert and 409 if the concert is already
-    cancelled.
+    Returns 404 for an unknown concert. Re-posting against an
+    already-cancelled concert returns 200 with the concert unchanged
+    rather than erroring, so repeated calls are safe. Takes no request
+    body.
     """
-    concert = db.query(Concert).filter(Concert.id == concert_id).first()
-    if not concert:
+    concert = cancel_concert(db, concert_id)
+    if concert is None:
         raise HTTPException(status_code=404, detail="Concert not found")
-    if concert.is_cancelled:
-        raise HTTPException(status_code=409, detail="Concert is already cancelled")
-
-    concert.is_cancelled = True
-    concert.cancellation_reason = payload.reason
-    db.commit()
-    db.refresh(concert)
     return concert
 
 

@@ -1,5 +1,10 @@
-"""Tests for the concert cancel/uncancel API endpoints and the
-`include_cancelled` filter on the concerts list endpoint.
+"""Tests for the concert uncancel API endpoint and the `include_cancelled`
+filter on the concerts list endpoint.
+
+`POST /api/v1/concerts/{id}/cancel` itself is covered by
+`tests/routers/test_concerts_cancel.py`, which exercises the idempotent,
+`ConcertStatus`-based contract it delegates to via
+`src.services.concert_service.cancel_concert`.
 
 Uses real venue/tour/concert fixtures persisted via the ORM so every
 foreign key is a genuine committed id, not a hardcoded literal like
@@ -22,61 +27,6 @@ def _seed_tour_and_venue(db_session, name="Cancellation Tour"):
     )
     venue = create_venues(db_session, count=1)[0]
     return tour, venue
-
-
-class TestCancelConcert:
-    def test_cancel_with_valid_reason_returns_200_and_sets_fields(self, client, db_session):
-        tour, venue = _seed_tour_and_venue(db_session)
-        concert = create_concert(
-            db_session, tour, venue, day_offset=5, ticket_price="50.00", base_time=datetime.now(),
-        )
-
-        response = client.post(
-            f"/api/v1/concerts/{concert.id}/cancel", json={"reason": "Artist illness"}
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["is_cancelled"] is True
-        assert data["cancellation_reason"] == "Artist illness"
-
-    def test_cancel_with_missing_reason_returns_422(self, client, db_session):
-        tour, venue = _seed_tour_and_venue(db_session)
-        concert = create_concert(
-            db_session, tour, venue, day_offset=5, ticket_price="50.00", base_time=datetime.now(),
-        )
-
-        response = client.post(f"/api/v1/concerts/{concert.id}/cancel", json={})
-
-        assert response.status_code == 422
-
-    def test_cancel_with_empty_reason_returns_422(self, client, db_session):
-        tour, venue = _seed_tour_and_venue(db_session)
-        concert = create_concert(
-            db_session, tour, venue, day_offset=5, ticket_price="50.00", base_time=datetime.now(),
-        )
-
-        response = client.post(f"/api/v1/concerts/{concert.id}/cancel", json={"reason": "   "})
-
-        assert response.status_code == 422
-
-    def test_cancel_already_cancelled_returns_409(self, client, db_session):
-        tour, venue = _seed_tour_and_venue(db_session)
-        concert = create_concert(
-            db_session, tour, venue, day_offset=5, ticket_price="50.00", base_time=datetime.now(),
-            is_cancelled=True, cancellation_reason="Weather",
-        )
-
-        response = client.post(
-            f"/api/v1/concerts/{concert.id}/cancel", json={"reason": "Another reason"}
-        )
-
-        assert response.status_code == 409
-
-    def test_cancel_unknown_concert_returns_404(self, client, db_session):
-        response = client.post("/api/v1/concerts/999999/cancel", json={"reason": "Weather"})
-
-        assert response.status_code == 404
 
 
 class TestUncancelConcert:
