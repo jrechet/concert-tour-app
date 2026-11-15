@@ -1,10 +1,18 @@
-"""Query logic for an artist's concerts, joined through the concert lineup."""
+"""Query logic for an artist's concerts, joined through the concert lineup,
+plus the concert duplication service."""
 
+from datetime import datetime
 from typing import List
 
 from sqlalchemy.orm import Session, joinedload
 
 from ..models import Concert, LineupEntry
+from .concerts_service import ConcertNotFoundError
+
+
+class VenueScheduleConflictError(Exception):
+    """Raised by `duplicate_concert` when another non-cancelled concert
+    already exists at the source's venue for the requested `date_time`."""
 
 
 def list_concerts_for_artist(db: Session, artist_id: str) -> List[Concert]:
@@ -34,3 +42,57 @@ def list_concerts_for_artist(db: Session, artist_id: str) -> List[Concert]:
         .distinct()
         .all()
     )
+
+
+def duplicate_concert(db: Session, concert_id: int, date_time: datetime) -> Concert:
+    """Duplicate a concert onto a new `date_time`, carrying over its tour,
+    venue, ticket price, and lineup.
+
+    Raises `ConcertNotFoundError` when no concert with `concert_id` exists.
+    Raises `VenueScheduleConflictError` when another non-cancelled concert
+    already exists at the source's venue for `date_time`; a concert at a
+    different venue, or a cancelled concert, at that same `date_time` does
+    not conflict. Neither error writes anything to the database.
+
+    On success, persists a new `Concert` carrying the source's `tour_id`,
+    `venue_id`, and `ticket_price`, with `tickets_sold` reset to 0, not
+    cancelled, and the requested `date_time`. The source's lineup is copied
+    as new `LineupEntry` rows (same `artist_name`/`set_order`/`set_time`,
+    not re-pointing to the source's own rows), so mutating the duplicate's
+    lineup afterward never alters the source's. Commits once and returns
+    the persisted duplicate.
+    """
+    source = db.query(Concert).filter(Concert.id == concert_id).first()
+    if source is None:
+        raise ConcertNotFoundError(f"Concert {concert_id} not found")
+
+    conflict = (
+        db.query(Concert.id)
+        .filter(
+            Concert.venue_id == source.venue_id,
+            Concert.date_time == date_time,
+            Concert.is_cancelled.is_(False),
+        )
+        .first()
+    )
+    if conflict is not None:
+        raise VenueScheduleConflictError(
+            f"Venue {source.venue_id} already has a concert scheduled at {date_time}"
+        )
+
+    duplicate = Concert(
+        tour_id=source.tour_id,
+        venue_id=source.venue_id,
+        date_time=date_time,
+        ticket_price=source.ticket_price,
+        tickets_sold=0,
+        is_cancelled=False,
+        lineup=[
+            LineupEntry(artist_name=entry.artist_name, set_order=entry.set_order, set_time=entry.set_time)
+            for entry in source.lineup
+        ],
+    )
+    db.add(duplicate)
+    db.commit()
+    db.refresh(duplicate)
+    return duplicate
