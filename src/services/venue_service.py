@@ -2,9 +2,23 @@
 
 from typing import List, Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..models import Concert, Venue
+
+
+class VenueNotFoundError(Exception):
+    """Raised by `delete_venue` when no venue with the given id exists."""
+
+
+class VenueHasConcertsError(Exception):
+    """Raised by `delete_venue` when the venue still hosts at least one
+    concert. Carries `concert_count` so the caller can report how many."""
+
+    def __init__(self, message: str, concert_count: int):
+        super().__init__(message)
+        self.concert_count = concert_count
 
 
 def list_venues(db: Session, min_capacity: Optional[int] = None) -> List[Venue]:
@@ -46,3 +60,28 @@ def list_venue_concerts(db: Session, venue_id: int) -> List[Concert]:
         .order_by(Concert.date_time)
         .all()
     )
+
+
+def delete_venue(db: Session, venue_id: int) -> None:
+    """Delete the venue with id `venue_id`.
+
+    Raises `VenueNotFoundError` when no venue with `venue_id` exists.
+    Raises `VenueHasConcertsError` (carrying the concert count, including
+    cancelled ones) when the venue hosts at least one concert, counted via
+    `func.count` over `Concert.venue_id` rather than loading every row. In
+    both cases no row is touched. On success, deletes the venue and commits.
+    """
+    venue = db.query(Venue).filter(Venue.id == venue_id).first()
+    if venue is None:
+        raise VenueNotFoundError(f"Venue {venue_id} not found")
+
+    concert_count = (
+        db.query(func.count(Concert.id)).filter(Concert.venue_id == venue_id).scalar()
+    )
+    if concert_count > 0:
+        raise VenueHasConcertsError(
+            f"Venue {venue_id} has {concert_count} concert(s)", concert_count
+        )
+
+    db.delete(venue)
+    db.commit()
