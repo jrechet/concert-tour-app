@@ -662,9 +662,9 @@ class TestGetCancellationStats:
 
         assert result.total_concerts == 4
         assert result.cancelled_concerts == 3
-        assert [(entry.tour_name, entry.cancelled_concerts) for entry in result.by_tour] == [
-            ("Homecoming Revival Tour", 2),
-            ("Neon Skyline World Tour", 1),
+        assert [(entry.tour_id, entry.tour_name, entry.cancelled_concerts) for entry in result.by_tour] == [
+            (tour_b.id, "Homecoming Revival Tour", 2),
+            (tour_a.id, "Neon Skyline World Tour", 1),
         ]
 
     def test_rate_rounds_to_one_decimal_one_of_three(self, db_session):
@@ -740,7 +740,7 @@ class TestGetCancellationStats:
 
         assert [entry.tour_name for entry in result.by_tour] == ["Neon Skyline World Tour"]
 
-    def test_by_tour_ordering_count_desc_then_name_asc_on_tie(self, db_session):
+    def test_by_tour_ordering_count_desc_then_tour_id_asc_on_tie(self, db_session):
         venues = create_venues(db_session, count=4)
         tour_zephyr = create_tour(
             db_session, "Zephyr Nightfall Tour", "Zephyr Nightingale",
@@ -761,4 +761,5 @@ class TestGetCancellationStats:
 
         result = get_cancellation_stats(db_session)
 
-        assert [entry.tour_name for entry in result.by_tour] == ["Aurora Dawn Tour", "Zephyr Nightfall Tour"]
+        assert tour_zephyr.id < tour_aurora.id
+        assert [entry.tour_name for entry in result.by_tour] == ["Zephyr Nightfall Tour", "Aurora Dawn Tour"]
