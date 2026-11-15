@@ -6,10 +6,12 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..models import Concert, Venue
+from ..schemas.venue import VenueUpdate
 
 
 class VenueNotFoundError(Exception):
-    """Raised by `delete_venue` when no venue with the given id exists."""
+    """Raised by `delete_venue`/`update_venue` when no venue with the given
+    id exists."""
 
 
 class VenueHasConcertsError(Exception):
@@ -19,6 +21,11 @@ class VenueHasConcertsError(Exception):
     def __init__(self, message: str, concert_count: int):
         super().__init__(message)
         self.concert_count = concert_count
+
+
+class VenueConflictError(Exception):
+    """Raised by `update_venue` when the resulting (name, city) pair
+    already belongs to a different venue."""
 
 
 def list_venues(db: Session, min_capacity: Optional[int] = None) -> List[Venue]:
@@ -85,3 +92,42 @@ def delete_venue(db: Session, venue_id: int) -> None:
 
     db.delete(venue)
     db.commit()
+
+
+def update_venue(db: Session, venue_id: int, payload: VenueUpdate) -> Venue:
+    """Apply a partial update to the venue with id `venue_id`.
+
+    Only the fields actually set on `payload` (via `exclude_unset`) are
+    changed; omitted fields keep their stored values. Raises
+    `VenueNotFoundError` when no venue with `venue_id` exists. Raises
+    `VenueConflictError` when the resulting (name, city) pair already
+    belongs to a *different* venue, including when only one of `name`/
+    `city` is sent and the venue's own unchanged value on the other field
+    completes the duplicate pair. The conflict check excludes the venue
+    being updated, so renaming it to its own current name/city is not a
+    conflict. On success, commits and returns the refreshed venue.
+    """
+    venue = db.query(Venue).filter(Venue.id == venue_id).first()
+    if venue is None:
+        raise VenueNotFoundError(f"Venue {venue_id} not found")
+
+    updates = payload.model_dump(exclude_unset=True)
+    new_name = updates.get("name", venue.name)
+    new_city = updates.get("city", venue.city)
+
+    conflict = (
+        db.query(Venue.id)
+        .filter(Venue.name == new_name, Venue.city == new_city, Venue.id != venue_id)
+        .first()
+    )
+    if conflict is not None:
+        raise VenueConflictError(
+            f"A venue named '{new_name}' already exists in {new_city}"
+        )
+
+    for field, value in updates.items():
+        setattr(venue, field, value)
+
+    db.commit()
+    db.refresh(venue)
+    return venue
