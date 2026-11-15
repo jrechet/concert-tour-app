@@ -57,7 +57,7 @@ def get_cancellation_stats(db: Session) -> CancellationStatsResponse:
     `by_tour` is built with a single `JOIN` + `GROUP BY tour_id` aggregate
     query (not one query per tour), and only includes tours with at least
     one cancelled concert, ordered by `cancelled_concerts` descending then
-    `tour_name` ascending for a deterministic response.
+    `tour_id` ascending for a deterministic response.
     """
     total_concerts = db.query(Concert).count()
     cancelled_concerts = db.query(Concert).filter(Concert.is_cancelled.is_(True)).count()
@@ -77,7 +77,7 @@ def get_cancellation_stats(db: Session) -> CancellationStatsResponse:
         .join(Concert, Concert.tour_id == Tour.id)
         .filter(Concert.is_cancelled.is_(True))
         .group_by(Tour.id, Tour.name)
-        .order_by(func.count(Concert.id).desc(), Tour.name.asc())
+        .order_by(func.count(Concert.id).desc(), Tour.id.asc())
         .all()
     )
     by_tour = [
