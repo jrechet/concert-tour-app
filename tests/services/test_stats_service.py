@@ -1,10 +1,11 @@
 """Unit tests for `get_concerts_per_weekday`, `get_revenue_by_city`,
-`get_capacity_stats`, `count_concerts_per_month`, and
-`count_concerts_per_artist`."""
+`get_capacity_stats`, `count_concerts_per_month`,
+`count_concerts_per_artist`, and `get_cancellation_stats`."""
 
 from datetime import datetime, timedelta
 
-from src.schemas.stats import CapacityStats, MonthlyConcertCount
+from src.schemas.stats import CancellationStatsResponse, CapacityStats, MonthlyConcertCount
+from src.services.stats import get_cancellation_stats
 from src.services.stats_service import (
     ArtistConcertCount,
     CityRevenue,
@@ -572,3 +573,192 @@ class TestCountConcertsPerArtist:
         assert len(result) == 1
         assert isinstance(result[0], ArtistConcertCount)
         assert result[0].artist_id == "Aurora Belle"
+
+
+class TestGetCancellationStats:
+    """Coverage for `get_cancellation_stats`."""
+
+    def test_empty_database_returns_zero_state(self, db_session):
+        result = get_cancellation_stats(db_session)
+
+        assert isinstance(result, CancellationStatsResponse)
+        assert result.total_concerts == 0
+        assert result.cancelled_concerts == 0
+        assert result.cancellation_rate == 0.0
+        assert result.by_tour == []
+
+    def test_all_concerts_cancelled_returns_full_rate(self, db_session):
+        venues = create_venues(db_session, count=2)
+        tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=0, ticket_price="80.00",
+            base_time=BASE_TIME, is_cancelled=True, cancellation_reason="Artist illness",
+        )
+        create_concert(
+            db_session, tour, venues[1], day_offset=1, ticket_price="90.00",
+            base_time=BASE_TIME, is_cancelled=True, cancellation_reason="Venue unavailable",
+        )
+
+        result = get_cancellation_stats(db_session)
+
+        assert result.total_concerts == 2
+        assert result.cancelled_concerts == 2
+        assert result.cancellation_rate == 100.0
+        assert [entry.cancelled_concerts for entry in result.by_tour] == [2]
+
+    def test_no_concert_cancelled_returns_empty_by_tour(self, db_session):
+        venues = create_venues(db_session, count=2)
+        tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=0, ticket_price="80.00",
+            base_time=BASE_TIME,
+        )
+        create_concert(
+            db_session, tour, venues[1], day_offset=1, ticket_price="90.00",
+            base_time=BASE_TIME,
+        )
+
+        result = get_cancellation_stats(db_session)
+
+        assert result.total_concerts == 2
+        assert result.cancelled_concerts == 0
+        assert result.cancellation_rate == 0.0
+        assert result.by_tour == []
+
+    def test_mixed_statuses_across_two_tours_counted_per_tour(self, db_session):
+        venues = create_venues(db_session, count=4)
+        tour_a = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        tour_b = create_tour(
+            db_session, "Homecoming Revival Tour", "The Midnight Collective",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        create_concert(
+            db_session, tour_a, venues[0], day_offset=0, ticket_price="80.00",
+            base_time=BASE_TIME, is_cancelled=True, cancellation_reason="Artist illness",
+        )
+        create_concert(
+            db_session, tour_a, venues[1], day_offset=1, ticket_price="80.00",
+            base_time=BASE_TIME,
+        )
+        create_concert(
+            db_session, tour_b, venues[2], day_offset=0, ticket_price="90.00",
+            base_time=BASE_TIME, is_cancelled=True, cancellation_reason="Venue unavailable",
+        )
+        create_concert(
+            db_session, tour_b, venues[3], day_offset=1, ticket_price="90.00",
+            base_time=BASE_TIME, is_cancelled=True, cancellation_reason="Venue unavailable",
+        )
+
+        result = get_cancellation_stats(db_session)
+
+        assert result.total_concerts == 4
+        assert result.cancelled_concerts == 3
+        assert [(entry.tour_name, entry.cancelled_concerts) for entry in result.by_tour] == [
+            ("Homecoming Revival Tour", 2),
+            ("Neon Skyline World Tour", 1),
+        ]
+
+    def test_rate_rounds_to_one_decimal_one_of_three(self, db_session):
+        venues = create_venues(db_session, count=3)
+        tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=0, ticket_price="80.00",
+            base_time=BASE_TIME, is_cancelled=True, cancellation_reason="Artist illness",
+        )
+        create_concert(
+            db_session, tour, venues[1], day_offset=1, ticket_price="80.00",
+            base_time=BASE_TIME,
+        )
+        create_concert(
+            db_session, tour, venues[2], day_offset=2, ticket_price="80.00",
+            base_time=BASE_TIME,
+        )
+
+        result = get_cancellation_stats(db_session)
+
+        assert result.cancellation_rate == 33.3
+
+    def test_rate_rounds_to_one_decimal_two_of_three(self, db_session):
+        venues = create_venues(db_session, count=3)
+        tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        create_concert(
+            db_session, tour, venues[0], day_offset=0, ticket_price="80.00",
+            base_time=BASE_TIME, is_cancelled=True, cancellation_reason="Artist illness",
+        )
+        create_concert(
+            db_session, tour, venues[1], day_offset=1, ticket_price="80.00",
+            base_time=BASE_TIME, is_cancelled=True, cancellation_reason="Venue unavailable",
+        )
+        create_concert(
+            db_session, tour, venues[2], day_offset=2, ticket_price="80.00",
+            base_time=BASE_TIME,
+        )
+
+        result = get_cancellation_stats(db_session)
+
+        assert result.cancellation_rate == 66.7
+
+    def test_tour_with_no_cancellation_omitted_from_by_tour(self, db_session):
+        venues = create_venues(db_session, count=3)
+        cancelled_tour = create_tour(
+            db_session, "Neon Skyline World Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        clean_tour = create_tour(
+            db_session, "Homecoming Revival Tour", "The Midnight Collective",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        create_concert(
+            db_session, cancelled_tour, venues[0], day_offset=0, ticket_price="80.00",
+            base_time=BASE_TIME, is_cancelled=True, cancellation_reason="Artist illness",
+        )
+        create_concert(
+            db_session, clean_tour, venues[1], day_offset=0, ticket_price="90.00",
+            base_time=BASE_TIME,
+        )
+        create_concert(
+            db_session, clean_tour, venues[2], day_offset=1, ticket_price="90.00",
+            base_time=BASE_TIME,
+        )
+
+        result = get_cancellation_stats(db_session)
+
+        assert [entry.tour_name for entry in result.by_tour] == ["Neon Skyline World Tour"]
+
+    def test_by_tour_ordering_count_desc_then_name_asc_on_tie(self, db_session):
+        venues = create_venues(db_session, count=4)
+        tour_zephyr = create_tour(
+            db_session, "Zephyr Nightfall Tour", "Zephyr Nightingale",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        tour_aurora = create_tour(
+            db_session, "Aurora Dawn Tour", "Aurora Belle",
+            BASE_TIME.date(), BASE_TIME.date(), "active",
+        )
+        create_concert(
+            db_session, tour_zephyr, venues[0], day_offset=0, ticket_price="80.00",
+            base_time=BASE_TIME, is_cancelled=True, cancellation_reason="Artist illness",
+        )
+        create_concert(
+            db_session, tour_aurora, venues[1], day_offset=0, ticket_price="90.00",
+            base_time=BASE_TIME, is_cancelled=True, cancellation_reason="Venue unavailable",
+        )
+
+        result = get_cancellation_stats(db_session)
+
+        assert [entry.tour_name for entry in result.by_tour] == ["Aurora Dawn Tour", "Zephyr Nightfall Tour"]
