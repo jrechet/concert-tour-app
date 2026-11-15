@@ -20,6 +20,7 @@ from ..models import Concert, LineupEntry, TicketTier, Tour, Venue
 from ..schemas import (
     CancelConcertRequest,
     ConcertDateRangeQuery,
+    ConcertDuplicateRequest,
     ConcertNextResponse,
     ConcertNotesUpdate,
     ConcertPriceFilter,
@@ -58,6 +59,7 @@ from ..services.concerts_service import (
     update_ticket_price,
 )
 from ..services.concerts_service import get_upcoming_concerts as fetch_upcoming_concerts
+from ..services.concert_service import VenueScheduleConflictError, duplicate_concert
 from ..services.lineup_service import (
     LineupEntryNotFoundError,
     clear_lineup,
@@ -561,6 +563,43 @@ def refund_tickets_endpoint(concert_id: int, payload: RefundRequest, db: Session
         raise HTTPException(status_code=404, detail="Concert not found")
     except InsufficientSoldTicketsError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
+
+
+@api_router.post(
+    "/{concert_id}/duplicate",
+    response_model=ConcertResponse,
+    status_code=201,
+    responses={
+        404: {
+            "description": "No concert exists with the given `concert_id`.",
+            "content": {"application/json": {"example": {"detail": "Concert not found"}}},
+        },
+        409: {
+            "description": "Another non-cancelled concert already exists at the source's venue for the requested `date_time`.",
+            "content": {"application/json": {"example": {"detail": "Venue already has a concert scheduled at that time"}}},
+        },
+        422: {
+            "description": "The requested `date_time` is in the past, or the body is missing/malformed.",
+        },
+    },
+)
+def duplicate_concert_endpoint(
+    concert_id: int, payload: ConcertDuplicateRequest, db: Session = Depends(get_db)
+):
+    """Duplicate a concert onto a new `date_time`, carrying over its tour,
+    venue, ticket price, and lineup.
+
+    Returns 404 for an unknown concert and 409 if another non-cancelled
+    concert already exists at the source's venue for the requested
+    `date_time`. A past `date_time` is rejected with a 422 by
+    `ConcertDuplicateRequest` itself.
+    """
+    try:
+        return duplicate_concert(db, concert_id, payload.date_time)
+    except ConcertNotFoundError:
+        raise HTTPException(status_code=404, detail="Concert not found")
+    except VenueScheduleConflictError:
+        raise HTTPException(status_code=409, detail="Venue already has a concert scheduled at that time")
 
 
 @api_router.get("/{concert_id}/lineup", response_model=List[LineupEntryResponse])
