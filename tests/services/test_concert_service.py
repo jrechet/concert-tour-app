@@ -1,5 +1,5 @@
-"""Unit tests for `update_ticket_price`, `clear_lineup`, and
-`list_concerts_for_artist`."""
+"""Unit tests for `update_ticket_price`, `clear_lineup`, `cancel_concert`,
+and `list_concerts_for_artist`."""
 
 from datetime import datetime
 from decimal import Decimal
@@ -7,8 +7,8 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import event as sa_event
 
-from src.models import LineupEntry
-from src.services.concert_service import list_concerts_for_artist
+from src.models import ConcertStatus, LineupEntry
+from src.services.concert_service import cancel_concert, list_concerts_for_artist
 from src.services.concerts_service import (
     ConcertCancelledError,
     ConcertNotFoundError,
@@ -94,6 +94,46 @@ class TestClearLineup:
         assert db_session.query(LineupEntry).filter(LineupEntry.concert_id == concert.id).count() == 0
         db_session.refresh(concert)
         assert concert is not None
+
+
+class TestCancelConcert:
+    """Coverage for `cancel_concert`."""
+
+    def test_cancels_a_scheduled_concert(self, db_session):
+        concert = _create_active_concert(db_session)
+        assert concert.status == ConcertStatus.scheduled
+
+        result = cancel_concert(db_session, concert.id)
+
+        assert result.id == concert.id
+        assert result.status == ConcertStatus.cancelled
+        db_session.refresh(concert)
+        assert concert.status == ConcertStatus.cancelled
+
+    def test_cancelling_an_already_cancelled_concert_is_a_noop(self, db_session):
+        concert = _create_active_concert(db_session)
+        first_result = cancel_concert(db_session, concert.id)
+        assert first_result.status == ConcertStatus.cancelled
+
+        commits = []
+
+        def _record_commit(session):
+            commits.append(session)
+
+        sa_event.listen(db_session, "after_commit", _record_commit)
+        try:
+            second_result = cancel_concert(db_session, concert.id)
+        finally:
+            sa_event.remove(db_session, "after_commit", _record_commit)
+
+        assert second_result.id == concert.id
+        assert second_result.status == ConcertStatus.cancelled
+        assert commits == []
+
+    def test_unknown_concert_id_returns_none(self, db_session):
+        result = cancel_concert(db_session, 999)
+
+        assert result is None
 
 
 def _create_concert(db_session, day_offset, is_cancelled=False, cancellation_reason=None):
