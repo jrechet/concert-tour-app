@@ -78,6 +78,7 @@ from .stats import (
     WEEKDAY_NAMES,
     CapacityStats,
     TourCancellationCount,
+    CancellationStats,
     CancellationStatsResponse,
     CANCELLATION_RATE_PRECISION,
 )
@@ -157,6 +158,7 @@ __all__ = [
     "WEEKDAY_NAMES",
     "CapacityStats",
     "TourCancellationCount",
+    "CancellationStats",
     "CancellationStatsResponse",
     "CANCELLATION_RATE_PRECISION",
 ]
