@@ -16,7 +16,9 @@ from sqlalchemy.orm import Session
 
 from ..database import get_reference_time
 from ..models import Concert, Tour, Venue
-from ..schemas.stats import CapacityStats, MonthlyConcertCount, PriceStats, WEEKDAY_NAMES
+from ..schemas.stats import BusiestVenue, CapacityStats, MonthlyConcertCount, PriceStats, WEEKDAY_NAMES
+
+DEFAULT_BUSIEST_VENUES_LIMIT = 5
 
 
 def get_distinct_cities(db: Session) -> List[str]:
@@ -296,4 +298,32 @@ def count_concerts_per_artist(db: Session) -> List[ArtistConcertCount]:
     return [
         ArtistConcertCount(artist_id=artist, name=artist, concert_count=count)
         for artist, count in rows
+    ]
+
+
+def get_busiest_venues(db: Session, limit: int = DEFAULT_BUSIEST_VENUES_LIMIT) -> List[BusiestVenue]:
+    """Return the venues with the most non-cancelled concerts, in one query,
+    ordered by count descending (ties broken by venue name ascending).
+
+    An inner `JOIN` from `Venue` to `Concert` (not a `LEFT OUTER JOIN`)
+    means a venue with zero non-cancelled concerts -- whether it has no
+    concerts at all or only cancelled ones -- is absent from the result,
+    rather than appearing with a count of 0. Capped at `limit` rows.
+    """
+    rows = (
+        db.query(
+            Venue.name,
+            Venue.city,
+            func.count(Concert.id).label("concert_count"),
+        )
+        .join(Concert, Concert.venue_id == Venue.id)
+        .filter(Concert.is_cancelled.is_(False))
+        .group_by(Venue.id, Venue.name, Venue.city)
+        .order_by(func.count(Concert.id).desc(), Venue.name.asc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        BusiestVenue(name=name, city=city, concert_count=count)
+        for name, city, count in rows
     ]

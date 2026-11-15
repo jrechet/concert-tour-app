@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 from src.models import Venue
 from src.services.stats import get_concerts_per_year
 from src.services.stats_service import (
+    DEFAULT_BUSIEST_VENUES_LIMIT,
+    get_busiest_venues,
     get_concert_counts_by_country,
     get_concert_counts_by_month,
     get_distinct_cities,
@@ -357,3 +359,94 @@ def test_get_concerts_per_year_aggregates_tickets_sold_and_defaults_to_zero(db_s
     by_year = {entry.year: entry for entry in result}
     assert by_year[2025].tickets_sold == 150
     assert by_year[2027].tickets_sold == 0
+
+
+def test_get_busiest_venues_returns_empty_list_when_no_concerts(db_session):
+    assert get_busiest_venues(db_session) == []
+
+
+def test_get_busiest_venues_returns_exactly_three_items_for_three_venues(db_session):
+    tour = _seed_tour(db_session)
+    venues = create_venues(db_session, count=3)
+    base_time = datetime.now()
+    for venue in venues:
+        create_concert(db_session, tour, venue, day_offset=1, ticket_price="50.00", base_time=base_time)
+
+    result = get_busiest_venues(db_session)
+
+    assert len(result) == 3
+
+
+def test_get_busiest_venues_caps_at_default_limit_of_five(db_session):
+    tour = _seed_tour(db_session)
+    venues = create_venues(db_session, count=7)
+    base_time = datetime.now()
+    for i, venue in enumerate(venues):
+        for j in range(i + 1):
+            create_concert(db_session, tour, venue, day_offset=j, ticket_price="50.00", base_time=base_time)
+
+    result = get_busiest_venues(db_session)
+
+    assert DEFAULT_BUSIEST_VENUES_LIMIT == 5
+    assert len(result) == 5
+    assert [entry.name for entry in result] == [venues[6].name, venues[5].name, venues[4].name, venues[3].name, venues[2].name]
+    assert [entry.concert_count for entry in result] == [7, 6, 5, 4, 3]
+
+
+def test_get_busiest_venues_excludes_cancelled_concerts_from_count(db_session):
+    tour = _seed_tour(db_session)
+    venue = create_venues(db_session, count=1)[0]
+    base_time = datetime.now()
+    create_concert(db_session, tour, venue, day_offset=0, ticket_price="50.00", base_time=base_time)
+    create_concert(
+        db_session, tour, venue, day_offset=1, ticket_price="50.00", base_time=base_time,
+        is_cancelled=True, cancellation_reason="Artist illness",
+    )
+    create_concert(
+        db_session, tour, venue, day_offset=2, ticket_price="50.00", base_time=base_time,
+        is_cancelled=True, cancellation_reason="Venue unavailable",
+    )
+
+    result = get_busiest_venues(db_session)
+
+    assert len(result) == 1
+    assert result[0].name == venue.name
+    assert result[0].concert_count == 1
+
+
+def test_get_busiest_venues_breaks_count_ties_by_name_ascending(db_session):
+    tour = _seed_tour(db_session)
+    venue_zebra = Venue(name="Zebra Hall", city="Berlin", country="Germany", capacity=5000)
+    venue_alpha = Venue(name="Alpha Arena", city="Paris", country="France", capacity=5000)
+    db_session.add_all([venue_zebra, venue_alpha])
+    db_session.commit()
+    db_session.refresh(venue_zebra)
+    db_session.refresh(venue_alpha)
+    base_time = datetime.now()
+    create_concert(db_session, tour, venue_zebra, day_offset=0, ticket_price="50.00", base_time=base_time)
+    create_concert(db_session, tour, venue_alpha, day_offset=1, ticket_price="50.00", base_time=base_time)
+
+    result = get_busiest_venues(db_session)
+
+    assert [entry.name for entry in result] == ["Alpha Arena", "Zebra Hall"]
+
+
+def test_get_busiest_venues_excludes_venue_with_no_concerts_and_venue_with_only_cancelled(db_session):
+    tour = _seed_tour(db_session)
+    venue_with_concert = Venue(name="Arena One", city="Berlin", country="Germany", capacity=5000)
+    venue_without_concert = Venue(name="Arena Two", city="Rome", country="Italy", capacity=5000)
+    venue_only_cancelled = Venue(name="Arena Three", city="Madrid", country="Spain", capacity=5000)
+    db_session.add_all([venue_with_concert, venue_without_concert, venue_only_cancelled])
+    db_session.commit()
+    for venue in (venue_with_concert, venue_without_concert, venue_only_cancelled):
+        db_session.refresh(venue)
+    base_time = datetime.now()
+    create_concert(db_session, tour, venue_with_concert, day_offset=0, ticket_price="50.00", base_time=base_time)
+    create_concert(
+        db_session, tour, venue_only_cancelled, day_offset=1, ticket_price="50.00", base_time=base_time,
+        is_cancelled=True, cancellation_reason="Artist illness",
+    )
+
+    result = get_busiest_venues(db_session)
+
+    assert [entry.name for entry in result] == ["Arena One"]
