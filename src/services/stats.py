@@ -1,12 +1,17 @@
-"""Query logic backing the monthly revenue stats endpoint."""
+"""Query/aggregation logic backing the revenue and cancellation stats endpoints."""
 
 from typing import List
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ..models import Concert
-from ..schemas.stats import MonthlyRevenue
+from ..models import Concert, Tour
+from ..schemas.stats import (
+    CANCELLATION_RATE_PRECISION,
+    CancellationStatsResponse,
+    MonthlyRevenue,
+    TourCancellationCount,
+)
 
 
 def get_revenue_by_month(db: Session) -> List[MonthlyRevenue]:
@@ -44,3 +49,45 @@ def get_revenue_by_month(db: Session) -> List[MonthlyRevenue]:
         )
         for row_year, row_month, tickets_sold, revenue in rows
     ]
+
+
+def get_cancellation_stats(db: Session) -> CancellationStatsResponse:
+    """Return overall and per-tour concert cancellation statistics.
+
+    `by_tour` is built with a single `JOIN` + `GROUP BY tour_id` aggregate
+    query (not one query per tour), and only includes tours with at least
+    one cancelled concert, ordered by `cancelled_concerts` descending then
+    `tour_name` ascending for a deterministic response.
+    """
+    total_concerts = db.query(Concert).count()
+    cancelled_concerts = db.query(Concert).filter(Concert.is_cancelled.is_(True)).count()
+
+    cancellation_rate = (
+        round(cancelled_concerts / total_concerts * 100, CANCELLATION_RATE_PRECISION)
+        if total_concerts
+        else 0.0
+    )
+
+    rows = (
+        db.query(
+            Tour.id.label("tour_id"),
+            Tour.name.label("tour_name"),
+            func.count(Concert.id).label("cancelled_concerts"),
+        )
+        .join(Concert, Concert.tour_id == Tour.id)
+        .filter(Concert.is_cancelled.is_(True))
+        .group_by(Tour.id, Tour.name)
+        .order_by(func.count(Concert.id).desc(), Tour.name.asc())
+        .all()
+    )
+    by_tour = [
+        TourCancellationCount(tour_id=row.tour_id, tour_name=row.tour_name, cancelled_concerts=row.cancelled_concerts)
+        for row in rows
+    ]
+
+    return CancellationStatsResponse(
+        total_concerts=total_concerts,
+        cancelled_concerts=cancelled_concerts,
+        cancellation_rate=cancellation_rate,
+        by_tour=by_tour,
+    )
