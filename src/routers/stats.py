@@ -17,6 +17,7 @@ from ..schemas import (
     CountResponse,
     CountryConcertCount,
     MonthlyConcertCount,
+    MonthlyRevenue,
     PriceStats,
     UpcomingCountResponse,
     VenuesResponse,
@@ -24,6 +25,7 @@ from ..schemas import (
     WeekdayCount,
     WeekdayStatsResponse,
 )
+from ..services.stats import get_revenue_by_month
 from ..services.stats_service import (
     count_concerts_per_artist,
     get_capacity_stats,
@@ -130,6 +132,16 @@ def get_revenue_by_city_stats(db: Session = Depends(get_db)):
         CityRevenue(city=entry.city_name, revenue=entry.revenue)
         for entry in get_revenue_by_city(db)
     ]
+
+
+@router.get("/revenue/months", response_model=List[MonthlyRevenue], status_code=200)
+def get_revenue_by_month_stats(db: Session = Depends(get_db)):
+    """Retrieve per-month tickets sold and revenue for non-cancelled
+    concerts, ordered chronologically ascending.
+
+    Returns 200 with an empty list (not an error) when there is no data.
+    """
+    return get_revenue_by_month(db)
 
 
 @router.get("/capacity", response_model=CapacityStats, status_code=200)
