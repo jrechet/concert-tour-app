@@ -6,10 +6,12 @@ import pytest
 from pydantic import ValidationError
 
 from src.schemas.stats import (
+    CancellationStats,
     CapacityStats,
     MonthlyConcertCount,
     PRICE_STATS_DECIMALS,
     PriceStats,
+    TourCancellationCount,
     WEEKDAY_NAMES,
     WeekdayCount,
     WeekdayStatsResponse,
@@ -125,3 +127,50 @@ class TestPriceStats:
     def test_avg_is_rounded_to_configured_precision(self):
         stats = PriceStats(min=10.0, avg=20.12345, max=30.0)
         assert stats.avg == round(20.12345, PRICE_STATS_DECIMALS)
+
+
+class TestCancellationStats:
+    """Test cases for the `CancellationStats` and `TourCancellationCount` schemas."""
+
+    def test_valid_payload_with_populated_by_tour(self):
+        stats = CancellationStats(
+            total_concerts=100,
+            cancelled_concerts=5,
+            cancellation_rate=5.0,
+            by_tour=[
+                TourCancellationCount(tour_id=1, tour_name="World Tour 2026", cancelled_concerts=5),
+            ],
+        )
+        assert stats.model_dump() == {
+            "total_concerts": 100,
+            "cancelled_concerts": 5,
+            "cancellation_rate": 5.0,
+            "by_tour": [
+                {"tour_id": 1, "tour_name": "World Tour 2026", "cancelled_concerts": 5},
+            ],
+        }
+
+    def test_default_payload_is_all_zero_with_empty_by_tour(self):
+        stats = CancellationStats(total_concerts=0, cancelled_concerts=0, cancellation_rate=0.0)
+        assert stats.model_dump() == {
+            "total_concerts": 0,
+            "cancelled_concerts": 0,
+            "cancellation_rate": 0.0,
+            "by_tour": [],
+        }
+
+    def test_negative_total_concerts_raises(self):
+        with pytest.raises(ValidationError):
+            CancellationStats(total_concerts=-1, cancelled_concerts=0, cancellation_rate=0.0)
+
+    def test_negative_cancelled_concerts_raises(self):
+        with pytest.raises(ValidationError):
+            CancellationStats(total_concerts=10, cancelled_concerts=-1, cancellation_rate=0.0)
+
+    def test_cancellation_rate_above_100_raises(self):
+        with pytest.raises(ValidationError):
+            CancellationStats(total_concerts=10, cancelled_concerts=5, cancellation_rate=100.1)
+
+    def test_cancelled_concerts_exceeding_total_raises(self):
+        with pytest.raises(ValidationError):
+            CancellationStats(total_concerts=5, cancelled_concerts=10, cancellation_rate=50.0)

@@ -334,7 +334,7 @@ class TourCancellationCount(BaseModel):
         }
 
 
-class CancellationStatsResponse(BaseModel):
+class CancellationStats(BaseModel):
     """Schema wrapping overall and per-tour concert cancellation statistics."""
 
     total_concerts: int = Field(..., ge=0, description="Total number of concerts")
@@ -353,7 +353,7 @@ class CancellationStatsResponse(BaseModel):
         return round(value, CANCELLATION_RATE_PRECISION)
 
     @model_validator(mode="after")
-    def validate_cancelled_not_exceeding_total(self) -> "CancellationStatsResponse":
+    def validate_cancelled_not_exceeding_total(self) -> "CancellationStats":
         """Reject a cancelled count that exceeds the total concert count."""
         if self.cancelled_concerts > self.total_concerts:
             raise ValueError("cancelled_concerts cannot exceed total_concerts")
@@ -371,3 +371,8 @@ class CancellationStatsResponse(BaseModel):
                 ],
             }
         }
+
+
+# Kept as an alias so the existing cancellation stats router/service (out of
+# this schema change's scope) keep working under their original import name.
+CancellationStatsResponse = CancellationStats
