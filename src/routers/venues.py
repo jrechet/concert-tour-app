@@ -10,14 +10,16 @@ from sqlalchemy.orm import Session
 from ..crud.venue import create_venue, get_venue_with_upcoming_concerts, venue_name_city_exists
 from ..database import get_db
 from ..schemas.concert import ConcertSummary
-from ..schemas.venue import VenueCreate, VenueDeleteConflict, VenueDetailRead, VenueOut, VenueResponse
+from ..schemas.venue import VenueCreate, VenueDeleteConflict, VenueDetailRead, VenueOut, VenueResponse, VenueUpdate
 from ..services.venue_service import (
+    VenueConflictError,
     VenueHasConcertsError,
     VenueNotFoundError,
     delete_venue,
     get_venue_or_none,
     list_venue_concerts,
     list_venues,
+    update_venue,
 )
 
 router = APIRouter(prefix="/api/v1/venues", tags=["venues"])
@@ -77,6 +79,19 @@ def get_venue(venue_id: int, db: Session = Depends(get_db)):
         capacity=venue.capacity,
         upcoming_concerts=venue.concerts,
     )
+
+
+@router.patch("/{venue_id}", response_model=VenueResponse)
+def patch_venue(venue_id: int, payload: VenueUpdate, db: Session = Depends(get_db)):
+    """Apply a partial update to a venue. Raises 404 when `venue_id` does
+    not exist, or 409 when the resulting (name, city) pair already
+    belongs to a different venue."""
+    try:
+        return update_venue(db, venue_id, payload)
+    except VenueNotFoundError:
+        raise HTTPException(status_code=404, detail="Venue not found")
+    except VenueConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
 
 
 @router.delete(
