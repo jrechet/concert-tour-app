@@ -53,6 +53,14 @@ class VenueResponse(BaseModel):
     capacity: int = Field(..., ge=0, description="Venue capacity")
 
 
+class VenueDeleteConflict(BaseModel):
+    """Schema for the 409 response when a venue cannot be deleted because
+    it still hosts concerts."""
+
+    detail: str = Field(..., description="Human-readable explanation of the conflict")
+    concert_count: int = Field(..., ge=0, description="Number of concerts hosted by this venue")
+
+
 class VenueListParams(BaseModel):
     """Query parameters accepted by `GET /api/v1/venues`."""
 
