@@ -4,9 +4,10 @@ Pydantic schemas for stats API responses.
 
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 PRICE_STATS_DECIMALS = 2
+CANCELLATION_RATE_PRECISION = 1
 
 WEEKDAY_NAMES: List[str] = [
     "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
@@ -311,5 +312,62 @@ class WeekdayStatsResponse(BaseModel):
         schema_extra = {
             "example": {
                 "weekdays": [{"weekday": name, "count": 0} for name in WEEKDAY_NAMES]
+            }
+        }
+
+
+class TourCancellationCount(BaseModel):
+    """Number of cancelled concerts for a single tour."""
+
+    tour_id: int = Field(..., description="Tour identifier")
+    tour_name: str = Field(..., description="Tour name")
+    cancelled_concerts: int = Field(..., ge=0, description="Number of cancelled concerts on this tour")
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "tour_id": 1,
+                "tour_name": "World Tour 2026",
+                "cancelled_concerts": 2,
+            }
+        }
+
+
+class CancellationStatsResponse(BaseModel):
+    """Schema wrapping overall and per-tour concert cancellation statistics."""
+
+    total_concerts: int = Field(..., ge=0, description="Total number of concerts")
+    cancelled_concerts: int = Field(..., ge=0, description="Number of cancelled concerts")
+    cancellation_rate: float = Field(
+        ..., ge=0, le=100, description="Percentage of concerts cancelled, rounded to 1 decimal place"
+    )
+    by_tour: List[TourCancellationCount] = Field(
+        default_factory=list, description="Cancellation counts broken down per tour"
+    )
+
+    @field_validator("cancellation_rate")
+    @classmethod
+    def round_cancellation_rate(cls, value: float) -> float:
+        """Round `cancellation_rate` to `CANCELLATION_RATE_PRECISION` decimal places."""
+        return round(value, CANCELLATION_RATE_PRECISION)
+
+    @model_validator(mode="after")
+    def validate_cancelled_not_exceeding_total(self) -> "CancellationStatsResponse":
+        """Reject a cancelled count that exceeds the total concert count."""
+        if self.cancelled_concerts > self.total_concerts:
+            raise ValueError("cancelled_concerts cannot exceed total_concerts")
+        return self
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "total_concerts": 100,
+                "cancelled_concerts": 5,
+                "cancellation_rate": 5.0,
+                "by_tour": [
+                    {"tour_id": 1, "tour_name": "World Tour 2026", "cancelled_concerts": 2},
+                ],
             }
         }
