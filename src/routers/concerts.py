@@ -26,6 +26,7 @@ from ..schemas import (
     ConcertPriceFilter,
     ConcertReschedule,
     ConcertResponse,
+    HeadlinerResponse,
     LineupEntryCreate,
     LineupEntryMove,
     LineupEntryOut,
@@ -59,7 +60,7 @@ from ..services.concerts_service import (
     update_ticket_price,
 )
 from ..services.concerts_service import get_upcoming_concerts as fetch_upcoming_concerts
-from ..services.concert_service import VenueScheduleConflictError, duplicate_concert
+from ..services.concert_service import EmptyLineupError, VenueScheduleConflictError, duplicate_concert, get_headliner
 from ..services.lineup_service import (
     LineupEntryNotFoundError,
     clear_lineup,
@@ -600,6 +601,32 @@ def duplicate_concert_endpoint(
         raise HTTPException(status_code=404, detail="Concert not found")
     except VenueScheduleConflictError:
         raise HTTPException(status_code=409, detail="Venue already has a concert scheduled at that time")
+
+
+@api_router.get(
+    "/{concert_id}/headliner",
+    response_model=HeadlinerResponse,
+    status_code=200,
+    responses={
+        404: {
+            "description": "No concert exists with the given `concert_id`, or it exists but has no lineup entries.",
+            "content": {"application/json": {"example": {"detail": "Concert 1 not found"}}},
+        },
+    },
+)
+def get_concert_headliner(concert_id: int, db: Session = Depends(get_db)):
+    """Retrieve a concert's headlining act: the lineup entry with the
+    greatest `set_order`.
+
+    Returns 404 for an unknown concert, and a distinct 404 when the concert
+    exists but its lineup is empty.
+    """
+    try:
+        return get_headliner(db, concert_id)
+    except ConcertNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except EmptyLineupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 @api_router.get("/{concert_id}/lineup", response_model=List[LineupEntryResponse])
