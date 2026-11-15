@@ -34,6 +34,11 @@ class Concert(Base):
         cascade="all, delete-orphan",
         order_by="LineupEntry.set_order",
     )
+    tiers = relationship(
+        "TicketTier",
+        back_populates="concert",
+        cascade="all, delete-orphan",
+    )
 
     @validates("tickets_sold")
     def validate_tickets_sold(self, key, value):
