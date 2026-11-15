@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta
 
 from src.models import Venue
+from src.services.stats import get_concerts_per_year
 from src.services.stats_service import (
     get_concert_counts_by_country,
     get_concert_counts_by_month,
@@ -290,3 +291,69 @@ def test_get_price_stats_returns_none_triple_when_only_ineligible_concerts(db_se
     assert result.min is None
     assert result.avg is None
     assert result.max is None
+
+
+def test_get_concerts_per_year_returns_empty_list_when_no_concerts(db_session):
+    assert get_concerts_per_year(db_session) == []
+
+
+def test_get_concerts_per_year_orders_multiple_years_oldest_first(db_session):
+    tour = _seed_tour(db_session)
+    venue = create_venues(db_session, count=1)[0]
+    create_concert(db_session, tour, venue, day_offset=0, ticket_price="50.00", base_time=datetime(2026, 1, 1))
+    create_concert(db_session, tour, venue, day_offset=0, ticket_price="50.00", base_time=datetime(2024, 1, 1))
+    create_concert(db_session, tour, venue, day_offset=0, ticket_price="50.00", base_time=datetime(2025, 1, 1))
+
+    result = get_concerts_per_year(db_session)
+
+    assert [entry.year for entry in result] == [2024, 2025, 2026]
+
+
+def test_get_concerts_per_year_omits_years_with_no_concerts(db_session):
+    tour = _seed_tour(db_session)
+    venue = create_venues(db_session, count=1)[0]
+    create_concert(db_session, tour, venue, day_offset=0, ticket_price="50.00", base_time=datetime(2024, 1, 1))
+    create_concert(db_session, tour, venue, day_offset=0, ticket_price="50.00", base_time=datetime(2026, 1, 1))
+
+    result = get_concerts_per_year(db_session)
+
+    assert [entry.year for entry in result] == [2024, 2026]
+
+
+def test_get_concerts_per_year_counts_cancelled_in_both_cancelled_and_concerts(db_session):
+    tour = _seed_tour(db_session)
+    venue = create_venues(db_session, count=1)[0]
+    base_time = datetime(2026, 3, 1)
+    create_concert(db_session, tour, venue, day_offset=0, ticket_price="50.00", base_time=base_time)
+    create_concert(db_session, tour, venue, day_offset=1, ticket_price="50.00", base_time=base_time)
+    create_concert(
+        db_session, tour, venue, day_offset=2, ticket_price="50.00", base_time=base_time,
+        is_cancelled=True, cancellation_reason="Artist illness",
+    )
+
+    result = get_concerts_per_year(db_session)
+
+    assert len(result) == 1
+    assert result[0].year == 2026
+    assert result[0].concerts == 3
+    assert result[0].cancelled == 1
+
+
+def test_get_concerts_per_year_aggregates_tickets_sold_and_defaults_to_zero(db_session):
+    tour = _seed_tour(db_session)
+    venue = create_venues(db_session, count=1)[0]
+    create_concert(
+        db_session, tour, venue, day_offset=0, ticket_price="50.00", base_time=datetime(2025, 5, 1),
+        tickets_sold=100,
+    )
+    create_concert(
+        db_session, tour, venue, day_offset=1, ticket_price="50.00", base_time=datetime(2025, 5, 1),
+        tickets_sold=50,
+    )
+    create_concert(db_session, tour, venue, day_offset=0, ticket_price="50.00", base_time=datetime(2027, 1, 1))
+
+    result = get_concerts_per_year(db_session)
+
+    by_year = {entry.year: entry for entry in result}
+    assert by_year[2025].tickets_sold == 150
+    assert by_year[2027].tickets_sold == 0
