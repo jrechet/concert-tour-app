@@ -60,11 +60,14 @@ from ..services.concerts_service import (
 )
 from ..services.concerts_service import get_upcoming_concerts as fetch_upcoming_concerts
 from ..services.concert_service import (
+    ConcertNotCancelledError,
+    ConcertPastDateError,
     EmptyLineupError,
     VenueScheduleConflictError,
     cancel_concert,
     duplicate_concert,
     get_headliner,
+    uncancel_concert,
 )
 from ..services.lineup_service import (
     LineupEntryNotFoundError,
@@ -521,24 +524,57 @@ def cancel_concert_endpoint(concert_id: int, db: Session = Depends(get_db)):
     return concert
 
 
-@api_router.post("/{concert_id}/uncancel", response_model=ConcertResponse)
-def uncancel_concert(concert_id: int, db: Session = Depends(get_db)):
-    """Restore a cancelled concert, clearing the cancellation reason.
+@api_router.post(
+    "/{concert_id}/uncancel",
+    response_model=ConcertResponse,
+    responses={
+        404: {
+            "description": "No concert exists with the given `concert_id`.",
+            "content": {"application/json": {"example": {"detail": "Concert not found"}}},
+        },
+        409: {
+            "description": (
+                "The concert is not currently cancelled, or it is cancelled "
+                "but its date has already passed."
+            ),
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "not_cancelled": {
+                            "summary": "Concert is not cancelled",
+                            "value": {"detail": "Concert 1 is not cancelled (status: scheduled)"},
+                        },
+                        "past_date": {
+                            "summary": "Concert's date has already passed",
+                            "value": {
+                                "detail": (
+                                    "Concert 1 cannot be uncancelled: date "
+                                    "2024-01-01 00:00:00 is in the past"
+                                )
+                            },
+                        },
+                    }
+                }
+            },
+        },
+    },
+)
+def uncancel_concert_endpoint(concert_id: int, db: Session = Depends(get_db)):
+    """Restore a cancelled concert to `ConcertStatus.scheduled`.
 
-    Returns 404 for an unknown concert and 409 if the concert is not
-    currently cancelled.
+    Returns 404 for an unknown concert, 409 if the concert is not
+    currently cancelled (the "not cancelled" reason names its current
+    status), and 409 if it is cancelled but its date has already passed
+    (the "past date" reason names that date). Takes no request body.
     """
-    concert = db.query(Concert).filter(Concert.id == concert_id).first()
-    if not concert:
+    try:
+        return uncancel_concert(db, concert_id)
+    except ConcertNotFoundError:
         raise HTTPException(status_code=404, detail="Concert not found")
-    if not concert.is_cancelled:
-        raise HTTPException(status_code=409, detail="Concert is not cancelled")
-
-    concert.is_cancelled = False
-    concert.cancellation_reason = None
-    db.commit()
-    db.refresh(concert)
-    return concert
+    except ConcertNotCancelledError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except ConcertPastDateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
 
 
 @api_router.post("/{concert_id}/tickets", response_model=ConcertResponse)

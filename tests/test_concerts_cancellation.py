@@ -13,6 +13,7 @@ venue_id=1.
 
 from datetime import datetime, timedelta
 
+from src.models import ConcertStatus
 from tests.fixtures.dashboard_fixtures import create_concert, create_tour, create_venues
 
 
@@ -30,19 +31,19 @@ def _seed_tour_and_venue(db_session, name="Cancellation Tour"):
 
 
 class TestUncancelConcert:
-    def test_uncancel_cancelled_concert_returns_200_and_clears_fields(self, client, db_session):
+    def test_uncancel_cancelled_concert_returns_200_and_restores_status(self, client, db_session):
         tour, venue = _seed_tour_and_venue(db_session)
         concert = create_concert(
             db_session, tour, venue, day_offset=5, ticket_price="50.00", base_time=datetime.now(),
-            is_cancelled=True, cancellation_reason="Weather",
         )
+        concert.status = ConcertStatus.cancelled
+        db_session.commit()
 
         response = client.post(f"/api/v1/concerts/{concert.id}/uncancel")
 
         assert response.status_code == 200
         data = response.json()
-        assert data["is_cancelled"] is False
-        assert data["cancellation_reason"] is None
+        assert data["status"] == "scheduled"
 
     def test_uncancel_non_cancelled_concert_returns_409(self, client, db_session):
         tour, venue = _seed_tour_and_venue(db_session)
