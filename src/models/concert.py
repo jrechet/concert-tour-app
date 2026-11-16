@@ -7,6 +7,7 @@ from sqlalchemy.orm import relationship, validates
 
 from ..config import ALMOST_SOLD_OUT_THRESHOLD
 from ..database import Base, get_reference_time
+from .exceptions import ConcertDateInPastError, ConcertNotCancelledError
 
 
 class ConcertStatus(str, enum.Enum):
@@ -167,6 +168,35 @@ class Concert(Base):
         negative once the concert's date has passed.
         """
         return (self.date_time.date() - get_reference_time().date()).days
+
+    def uncancel(self):
+        """Restore a cancelled concert to `ConcertStatus.scheduled`, in place.
+
+        Raises `ConcertNotCancelledError` when `status` isn't
+        `ConcertStatus.cancelled` (the message names the current status).
+        This check runs first, so a concert that is both not cancelled and
+        past-dated always raises `ConcertNotCancelledError`, never
+        `ConcertDateInPastError` -- deterministic, so a caller (e.g. the API
+        layer) can rely on the raised type to report which rule failed.
+
+        Raises `ConcertDateInPastError` when the concert is cancelled but
+        its calendar date (compared via `get_reference_time()`, not the
+        real wall clock, so callers can control "now") has already passed.
+
+        On success, only `status` changes, to `ConcertStatus.scheduled`;
+        every other field is left untouched.
+        """
+        if self.status != ConcertStatus.cancelled:
+            raise ConcertNotCancelledError(
+                f"Concert is not cancelled (status: {self.status.value})"
+            )
+
+        if self.date_time.date() < get_reference_time().date():
+            raise ConcertDateInPastError(
+                f"Concert cannot be uncancelled: date {self.date_time.date()} is in the past"
+            )
+
+        self.status = ConcertStatus.scheduled
 
 
 @event.listens_for(Concert, "before_insert")
