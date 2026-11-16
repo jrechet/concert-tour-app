@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session, joinedload
 from ..config import CITY_SEARCH_DEBOUNCE_MS, DEFAULT_PAGE_SIZE, LOW_STOCK_THRESHOLD, MAX_PAGE_SIZE
 from ..database import get_db, get_reference_time
 from ..models import Concert, LineupEntry, TicketTier, Tour, Venue
+from ..models.exceptions import ConcertDateInPastError, ConcertNotCancelledError
 from ..schemas import (
     ConcertDateRangeQuery,
     ConcertDuplicateRequest,
@@ -60,8 +61,6 @@ from ..services.concerts_service import (
 )
 from ..services.concerts_service import get_upcoming_concerts as fetch_upcoming_concerts
 from ..services.concert_service import (
-    ConcertNotCancelledError,
-    ConcertPastDateError,
     EmptyLineupError,
     VenueScheduleConflictError,
     cancel_concert,
@@ -542,14 +541,14 @@ def cancel_concert_endpoint(concert_id: int, db: Session = Depends(get_db)):
                     "examples": {
                         "not_cancelled": {
                             "summary": "Concert is not cancelled",
-                            "value": {"detail": "Concert 1 is not cancelled (status: scheduled)"},
+                            "value": {"detail": "Concert is not cancelled (status: scheduled)"},
                         },
                         "past_date": {
                             "summary": "Concert's date has already passed",
                             "value": {
                                 "detail": (
-                                    "Concert 1 cannot be uncancelled: date "
-                                    "2024-01-01 00:00:00 is in the past"
+                                    "Concert cannot be uncancelled: date "
+                                    "2024-01-01 is in the past"
                                 )
                             },
                         },
@@ -572,9 +571,9 @@ def uncancel_concert_endpoint(concert_id: int, db: Session = Depends(get_db)):
     except ConcertNotFoundError:
         raise HTTPException(status_code=404, detail="Concert not found")
     except ConcertNotCancelledError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
-    except ConcertPastDateError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
+        raise HTTPException(status_code=409, detail=exc.detail)
+    except ConcertDateInPastError as exc:
+        raise HTTPException(status_code=409, detail=exc.detail)
 
 
 @api_router.post("/{concert_id}/tickets", response_model=ConcertResponse)
