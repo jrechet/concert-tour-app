@@ -1,4 +1,9 @@
-"""Unit tests for `uncancel_concert`, independent of the HTTP layer."""
+"""Unit tests for `uncancel_concert`, independent of the HTTP layer.
+
+`uncancel_concert` delegates the transition itself to `Concert.uncancel()`,
+so the "now" it's compared against is `src.models.concert.get_reference_time`
+(the model's import of it), not any copy on the service module.
+"""
 
 from datetime import datetime
 
@@ -6,11 +11,8 @@ import pytest
 from sqlalchemy import event as sa_event
 
 from src.models import ConcertStatus
-from src.services.concert_service import (
-    ConcertNotCancelledError,
-    ConcertPastDateError,
-    uncancel_concert,
-)
+from src.models.exceptions import ConcertDateInPastError, ConcertNotCancelledError
+from src.services.concert_service import uncancel_concert
 from src.services.concerts_service import ConcertNotFoundError
 from tests.fixtures.dashboard_fixtures import create_concert, create_tour, create_venues
 
@@ -45,7 +47,7 @@ class TestUncancelConcert:
 
     def test_restores_cancelled_future_concert_and_persists_status(self, db_session, monkeypatch):
         concert = _create_concert(db_session, day_offset=5, status=ConcertStatus.cancelled)
-        monkeypatch.setattr("src.services.concert_service.get_reference_time", lambda: BASE_TIME)
+        monkeypatch.setattr("src.models.concert.get_reference_time", lambda: BASE_TIME)
 
         result = uncancel_concert(db_session, concert.id)
 
@@ -74,19 +76,21 @@ class TestUncancelConcert:
         db_session.refresh(concert)
         assert concert.status == ConcertStatus.scheduled
 
-    def test_cancelled_but_past_dated_concert_raises_past_date_without_writing(self, db_session):
+    def test_cancelled_but_past_dated_concert_raises_past_date_without_writing(self, db_session, monkeypatch):
         concert = _create_concert(db_session, day_offset=-5, status=ConcertStatus.cancelled)
+        monkeypatch.setattr("src.models.concert.get_reference_time", lambda: BASE_TIME)
         commits = _track_commits(db_session)
 
-        with pytest.raises(ConcertPastDateError):
+        with pytest.raises(ConcertDateInPastError):
             uncancel_concert(db_session, concert.id)
 
         assert commits == []
         db_session.refresh(concert)
         assert concert.status == ConcertStatus.cancelled
 
-    def test_non_cancelled_and_past_dated_concert_raises_not_cancelled_deterministically(self, db_session):
+    def test_non_cancelled_and_past_dated_concert_raises_not_cancelled_deterministically(self, db_session, monkeypatch):
         concert = _create_concert(db_session, day_offset=-5, status=ConcertStatus.scheduled)
+        monkeypatch.setattr("src.models.concert.get_reference_time", lambda: BASE_TIME)
         commits = _track_commits(db_session)
 
         with pytest.raises(ConcertNotCancelledError):
@@ -97,7 +101,7 @@ class TestUncancelConcert:
     def test_defaults_reference_time_to_get_reference_time(self, db_session, monkeypatch):
         concert = _create_concert(db_session, day_offset=-1, status=ConcertStatus.cancelled)
 
-        monkeypatch.setattr("src.services.concert_service.get_reference_time", lambda: BASE_TIME)
+        monkeypatch.setattr("src.models.concert.get_reference_time", lambda: BASE_TIME)
 
-        with pytest.raises(ConcertPastDateError):
+        with pytest.raises(ConcertDateInPastError):
             uncancel_concert(db_session, concert.id)

@@ -86,7 +86,7 @@ def test_uncancel_cancelled_past_dated_concert_returns_409_naming_the_date(clien
     assert response.status_code == 409
     detail = response.json()["detail"]
     assert "past" in detail
-    assert str(concert.date_time) in detail
+    assert str(concert.date_time.date()) in detail
 
 
 def test_the_two_409_details_are_distinguishable(client, db_session):

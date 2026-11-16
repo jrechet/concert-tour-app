@@ -6,7 +6,6 @@ from typing import List, Optional
 
 from sqlalchemy.orm import Session, joinedload
 
-from ..database import get_reference_time
 from ..models import Concert, ConcertStatus, LineupEntry
 from .concerts_service import ConcertNotFoundError
 
@@ -20,16 +19,6 @@ class EmptyLineupError(Exception):
     """Raised by `get_headliner` when `concert_id` identifies a real
     concert whose lineup has no acts, distinguishing it from an unknown
     concert (`ConcertNotFoundError`)."""
-
-
-class ConcertNotCancelledError(Exception):
-    """Raised by `uncancel_concert` when the concert's `status` isn't
-    `ConcertStatus.cancelled`; the message names its current status."""
-
-
-class ConcertPastDateError(Exception):
-    """Raised by `uncancel_concert` when the concert is cancelled but its
-    `date_time` has already passed; the message names that date."""
 
 
 def get_headliner(db: Session, concert_id: int) -> LineupEntry:
@@ -84,32 +73,18 @@ def uncancel_concert(db: Session, concert_id: int) -> Concert:
     """Restore a cancelled concert to `ConcertStatus.scheduled`.
 
     Raises `ConcertNotFoundError` when no concert with `concert_id` exists.
-    Raises `ConcertNotCancelledError` when the concert's `status` isn't
-    `cancelled` (the message names its current status), checked before the
-    date check so a concert that is both non-cancelled and past-dated
-    always raises this error rather than `ConcertPastDateError`. Raises
-    `ConcertPastDateError` when the concert is cancelled but its calendar
-    date (compared via `get_reference_time()`, not the real wall clock, so
-    tests can control "now") has already passed. Neither error writes
-    anything to the database. On success, sets `status` to
-    `ConcertStatus.scheduled`, commits, and returns the refreshed concert.
+    The transition itself is delegated to `Concert.uncancel()`, so its
+    `ConcertNotCancelledError`/`ConcertDateInPastError` (from
+    `src.models.exceptions`) propagate unchanged, and neither writes
+    anything to the database. On success, commits once and returns the
+    refreshed concert.
     """
     concert = db.query(Concert).filter(Concert.id == concert_id).first()
     if concert is None:
         raise ConcertNotFoundError(f"Concert {concert_id} not found")
 
-    if concert.status != ConcertStatus.cancelled:
-        raise ConcertNotCancelledError(
-            f"Concert {concert_id} is not cancelled (status: {concert.status.value})"
-        )
+    concert.uncancel()
 
-    reference_time = get_reference_time()
-    if concert.date_time.date() < reference_time.date():
-        raise ConcertPastDateError(
-            f"Concert {concert_id} cannot be uncancelled: date {concert.date_time} is in the past"
-        )
-
-    concert.status = ConcertStatus.scheduled
     db.commit()
     db.refresh(concert)
     return concert
