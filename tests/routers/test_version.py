@@ -21,3 +21,10 @@ def test_api_root_returns_api_version(client):
 
     assert response.status_code == 200
     assert response.json()["version"] == "1"
+
+
+def test_api_root_returns_api_name(client):
+    response = client.get("/api/v1/")
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "concert-tour-app"
