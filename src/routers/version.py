@@ -7,6 +7,12 @@ from ..core.version import VersionNotFoundError, get_app_version
 router = APIRouter(prefix="/api/v1", tags=["version"])
 
 
+@router.get("/")
+def get_api_root():
+    """API root endpoint, reporting the current API version."""
+    return {"version": "1"}
+
+
 @router.get("/version")
 def get_version():
     """Retrieve the app version declared in pyproject.toml."""

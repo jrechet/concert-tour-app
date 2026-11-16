@@ -14,3 +14,10 @@ def test_version_endpoint_requires_no_auth(client):
     response = client.get("/api/v1/version", headers={})
 
     assert response.status_code == 200
+
+
+def test_api_root_returns_api_version(client):
+    response = client.get("/api/v1/")
+
+    assert response.status_code == 200
+    assert response.json()["version"] == "1"
