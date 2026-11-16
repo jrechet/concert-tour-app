@@ -9,8 +9,8 @@ router = APIRouter(prefix="/api/v1", tags=["version"])
 
 @router.get("/")
 def get_api_root():
-    """API root endpoint, reporting the current API version."""
-    return {"version": "1"}
+    """API root endpoint, reporting the current API name and version."""
+    return {"name": "concert-tour-app", "version": "1"}
 
 
 @router.get("/version")
