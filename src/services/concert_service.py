@@ -1,13 +1,18 @@
 """Query logic for an artist's concerts, joined through the concert lineup,
 plus the concert duplication service."""
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from sqlalchemy.orm import Session, joinedload
 
 from ..models import Concert, ConcertStatus, LineupEntry
 from .concerts_service import ConcertNotFoundError
+
+# Length of the "coming week" window used by `get_concerts_for_week`, in days.
+# A module-level constant rather than an inline `7` so the window can be
+# tuned (or later made env-configurable) in one place.
+WEEK_WINDOW_DAYS = 7
 
 
 class VenueScheduleConflictError(Exception):
@@ -115,6 +120,41 @@ def list_concerts_for_artist(db: Session, artist_id: str) -> List[Concert]:
         .filter(LineupEntry.artist_name == artist_id, Concert.is_cancelled.is_(False))
         .order_by(Concert.date_time)
         .distinct()
+        .all()
+    )
+
+
+def get_concerts_for_week(db: Session, now: Optional[datetime] = None) -> List[Concert]:
+    """Return every non-cancelled concert starting within the coming week,
+    i.e. in `[now, now + WEEK_WINDOW_DAYS days]` inclusive of both ends,
+    ordered soonest first.
+
+    `now` defaults to the current timezone-aware UTC instant, but can be
+    injected by callers (e.g. tests) to control the clock. `Concert.date_time`
+    is stored naive, under the same naive-means-UTC convention used by
+    `concerts_service.reschedule_concert`, so an aware `now` is converted to
+    UTC and stripped of its tzinfo before being compared against the column.
+
+    Excludes `ConcertStatus.cancelled` concerts via the model's enum member
+    (never a raw string), so model/migration casing can't drift this filter
+    out of sync. The venue is eager-loaded via `joinedload` so reading
+    `venue.name`/`venue.city` on each result does not issue an extra query
+    per concert. Returns `[]`, never `None`, when nothing matches.
+    """
+    reference = now if now is not None else datetime.now(timezone.utc)
+    if reference.tzinfo is not None:
+        reference = reference.astimezone(timezone.utc).replace(tzinfo=None)
+    window_end = reference + timedelta(days=WEEK_WINDOW_DAYS)
+
+    return (
+        db.query(Concert)
+        .options(joinedload(Concert.venue))
+        .filter(
+            Concert.date_time >= reference,
+            Concert.date_time <= window_end,
+            Concert.status != ConcertStatus.cancelled,
+        )
+        .order_by(Concert.date_time.asc())
         .all()
     )
 
