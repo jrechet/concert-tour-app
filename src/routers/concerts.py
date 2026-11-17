@@ -26,6 +26,7 @@ from ..schemas import (
     ConcertPriceFilter,
     ConcertReschedule,
     ConcertResponse,
+    ConcertWeekItem,
     HeadlinerResponse,
     LineupEntryCreate,
     LineupEntryMove,
@@ -65,6 +66,7 @@ from ..services.concert_service import (
     VenueScheduleConflictError,
     cancel_concert,
     duplicate_concert,
+    get_concerts_for_week,
     get_headliner,
     uncancel_concert,
 )
@@ -371,6 +373,19 @@ def get_concerts_between(
     bounds themselves are delegated entirely to `get_concerts_between_dates`.
     """
     return get_concerts_between_dates(db, date_range.start, date_range.end)
+
+
+@api_router.get("/week", response_model=List[ConcertWeekItem], status_code=200)
+def get_concerts_for_week_endpoint(db: Session = Depends(get_db)):
+    """Retrieve non-cancelled concerts starting within the coming week,
+    soonest first.
+
+    Registered ahead of `/{concert_id}` so the literal `week` path segment
+    isn't swallowed as a concert ID. Returns an empty list (not a 404) when
+    no concert falls in the window; all query logic lives in
+    `get_concerts_for_week`.
+    """
+    return get_concerts_for_week(db)
 
 
 @api_router.get("/{concert_id}", response_model=ConcertResponse)
