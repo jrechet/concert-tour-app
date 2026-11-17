@@ -421,6 +421,42 @@ class ConcertSummary(BaseModel):
         return ConcertStatus.cancelled if v else ConcertStatus.scheduled
 
 
+class ConcertWeekItem(BaseModel):
+    """Read schema for a single entry in `GET /api/v1/concerts/week`.
+
+    `title` mirrors the convention used by `ConcertSummary`/`SoldOutConcertRead`:
+    sourced from the concert's parent tour, since `Concert` has no title column
+    of its own. `venue_name`/`venue_city` reuse the `Concert.venue_name`/
+    `Concert.venue_city` properties (which already flatten the related `Venue`)
+    rather than nesting the whole venue. Both are required (not `Optional`):
+    those properties return `None` when no venue is attached, and the
+    validator below turns that into a clear error instead of silently
+    serialising `venue_name: null`.
+    """
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: int = Field(..., description="Unique concert identifier")
+    title: str = Field(
+        ..., validation_alias=AliasPath("tour", "name"), description="Title of the tour this concert belongs to"
+    )
+    start_date: datetime = Field(
+        ..., validation_alias="date_time", description="Concert start date and time"
+    )
+    status: ConcertStatus = Field(..., description="Concert lifecycle status")
+    venue_name: str = Field(..., description="Name of the venue hosting this concert")
+    venue_city: str = Field(..., description="City of the venue hosting this concert")
+
+    @field_validator("venue_name", "venue_city", mode="before")
+    @classmethod
+    def reject_missing_venue(cls, v):
+        """Raise a clear error instead of silently serialising `None` when
+        the concert has no venue attached."""
+        if v is None:
+            raise ValueError("concert has no associated venue")
+        return v
+
+
 class ConcertVenueRead(BaseModel):
     """Minimal venue details embedded in `ArtistConcertRead`."""
 
