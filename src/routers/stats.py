@@ -21,6 +21,7 @@ from ..schemas import (
     MonthlyConcertCount,
     MonthlyRevenue,
     PriceStats,
+    TopArtistStat,
     UpcomingCountResponse,
     VenuesResponse,
     WEEKDAY_NAMES,
@@ -41,6 +42,7 @@ from ..services.stats_service import (
     get_distinct_venue_names,
     get_price_stats,
     get_revenue_by_city,
+    get_top_artists,
     get_upcoming_concert_count,
 )
 
@@ -165,6 +167,18 @@ def get_artists_stats(db: Session = Depends(get_db)):
     Returns 200 with an empty list (not an error) when there is no lineup.
     """
     return count_concerts_per_artist(db)
+
+
+@router.get("/artists/top", response_model=List[TopArtistStat], status_code=200)
+def get_top_artists_stats(db: Session = Depends(get_db)):
+    """Retrieve the artists with the most non-cancelled lineup appearances,
+    ordered by appearance count descending (ties broken alphabetically by
+    name), capped at 5 entries.
+
+    Returns 200 with an empty list (not an error) when there is no
+    non-cancelled lineup appearance.
+    """
+    return get_top_artists(db)
 
 
 @router.get("/weekdays", response_model=WeekdayStatsResponse)
