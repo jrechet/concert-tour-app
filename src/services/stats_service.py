@@ -14,9 +14,10 @@ from typing import List, Optional, Tuple
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from ..config import TOP_ARTISTS_LIMIT
 from ..database import get_reference_time
-from ..models import Concert, Tour, Venue
-from ..schemas.stats import BusiestVenue, CapacityStats, MonthlyConcertCount, PriceStats, WEEKDAY_NAMES
+from ..models import Concert, ConcertStatus, LineupEntry, Tour, Venue
+from ..schemas.stats import BusiestVenue, CapacityStats, MonthlyConcertCount, PriceStats, TopArtistStat, WEEKDAY_NAMES
 
 DEFAULT_BUSIEST_VENUES_LIMIT = 5
 
@@ -326,4 +327,35 @@ def get_busiest_venues(db: Session, limit: int = DEFAULT_BUSIEST_VENUES_LIMIT) -
     return [
         BusiestVenue(name=name, city=city, concert_count=count)
         for name, city, count in rows
+    ]
+
+
+def get_top_artists(db: Session, limit: int = TOP_ARTISTS_LIMIT) -> List[TopArtistStat]:
+    """Return the artists with the most non-cancelled lineup appearances, in
+    one query, ordered by appearance count descending (ties broken by
+    artist name ascending). Capped at `limit` rows.
+
+    An inner `JOIN` from `LineupEntry` to `Concert` (not a `LEFT OUTER
+    JOIN`) means an artist with zero non-cancelled appearances -- whether
+    they have no lineup entry at all or only entries on cancelled concerts
+    -- is absent from the result, rather than appearing with a count of 0.
+    Cancelled concerts are excluded via `Concert.status`'s `ConcertStatus`
+    enum member (never a raw string), so model/migration casing can't drift
+    this filter out of sync.
+    """
+    rows = (
+        db.query(
+            LineupEntry.artist_name,
+            func.count(LineupEntry.id).label("appearances"),
+        )
+        .join(Concert, Concert.id == LineupEntry.concert_id)
+        .filter(Concert.status != ConcertStatus.cancelled)
+        .group_by(LineupEntry.artist_name)
+        .order_by(func.count(LineupEntry.id).desc(), LineupEntry.artist_name.asc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        TopArtistStat(name=name, appearances=appearances)
+        for name, appearances in rows
     ]
