@@ -1,10 +1,12 @@
 """Unit tests for `get_concerts_per_weekday`, `get_revenue_by_city`,
 `get_capacity_stats`, `count_concerts_per_month`,
-`count_concerts_per_artist`, and `get_cancellation_stats`."""
+`count_concerts_per_artist`, `get_cancellation_stats`, and `get_top_artists`."""
 
 from datetime import datetime, timedelta
 
+from src.models import LineupEntry
 from src.schemas.stats import CancellationStatsResponse, CapacityStats, MonthlyConcertCount
+from src.services.concert_service import cancel_concert
 from src.services.stats import get_cancellation_stats
 from src.services.stats_service import (
     ArtistConcertCount,
@@ -14,6 +16,7 @@ from src.services.stats_service import (
     get_capacity_stats,
     get_concerts_per_weekday,
     get_revenue_by_city,
+    get_top_artists,
 )
 from tests.fixtures.dashboard_fixtures import create_concert, create_tour, create_venues
 
@@ -763,3 +766,110 @@ class TestGetCancellationStats:
 
         assert tour_zephyr.id < tour_aurora.id
         assert [entry.tour_name for entry in result.by_tour] == ["Zephyr Nightfall Tour", "Aurora Dawn Tour"]
+
+
+def _make_concert_for_artist(db_session, venue, day_offset, tour_name, artist):
+    """Persist a scheduled concert linked to a real tour and venue via FK."""
+    tour = create_tour(db_session, tour_name, artist, BASE_TIME.date(), BASE_TIME.date(), "active")
+    return create_concert(db_session, tour, venue, day_offset=day_offset, ticket_price="80.00", base_time=BASE_TIME)
+
+
+def _add_appearance(db_session, concert, artist_name, set_order=1):
+    """Record `artist_name` as a lineup appearance on `concert`."""
+    entry = LineupEntry(concert_id=concert.id, artist_name=artist_name, set_order=set_order)
+    db_session.add(entry)
+    db_session.commit()
+    db_session.refresh(entry)
+    return entry
+
+
+class TestGetTopArtists:
+    """Coverage for `get_top_artists`."""
+
+    def test_returns_empty_list_when_no_artists(self, db_session):
+        assert get_top_artists(db_session) == []
+
+    def test_returns_empty_list_when_all_concerts_cancelled(self, db_session):
+        venue = create_venues(db_session, count=1)[0]
+        concert = _make_concert_for_artist(db_session, venue, 0, "Tour 1", "Aurora Belle")
+        _add_appearance(db_session, concert, "Aurora Belle")
+        cancel_concert(db_session, concert.id)
+
+        assert get_top_artists(db_session) == []
+
+    def test_orders_by_appearance_count_desc(self, db_session):
+        venues = create_venues(db_session, count=2)
+
+        concert_a1 = _make_concert_for_artist(db_session, venues[0], 0, "Tour A1", "Comet Rider")
+        _add_appearance(db_session, concert_a1, "Comet Rider")
+        concert_a2 = _make_concert_for_artist(db_session, venues[0], 1, "Tour A2", "Comet Rider")
+        _add_appearance(db_session, concert_a2, "Comet Rider")
+
+        concert_b1 = _make_concert_for_artist(db_session, venues[1], 2, "Tour B1", "Lonely Static")
+        _add_appearance(db_session, concert_b1, "Lonely Static")
+
+        result = get_top_artists(db_session)
+
+        assert [stat.name for stat in result] == ["Comet Rider", "Lonely Static"]
+        assert [stat.appearances for stat in result] == [2, 1]
+
+    def test_ties_broken_by_name_asc(self, db_session):
+        venue = create_venues(db_session, count=1)[0]
+
+        concert_z = _make_concert_for_artist(db_session, venue, 0, "Tour Z", "Zebra Collective")
+        _add_appearance(db_session, concert_z, "Zebra Collective")
+
+        concert_a = _make_concert_for_artist(db_session, venue, 1, "Tour A", "Antler Brothers")
+        _add_appearance(db_session, concert_a, "Antler Brothers")
+
+        result = get_top_artists(db_session)
+
+        assert [stat.name for stat in result] == ["Antler Brothers", "Zebra Collective"]
+
+    def test_limits_to_five_when_six_artists_play(self, db_session):
+        venue = create_venues(db_session, count=1)[0]
+        artists = ["Artist F", "Artist E", "Artist D", "Artist C", "Artist B", "Artist A"]
+
+        for i, artist in enumerate(artists):
+            appearance_count = len(artists) - i
+            for appearance_index in range(appearance_count):
+                concert = _make_concert_for_artist(
+                    db_session, venue,
+                    day_offset=i * 10 + appearance_index,
+                    tour_name=f"{artist} Tour {appearance_index}",
+                    artist=artist,
+                )
+                _add_appearance(db_session, concert, artist)
+
+        result = get_top_artists(db_session)
+
+        assert len(result) == 5
+        assert [stat.name for stat in result] == ["Artist F", "Artist E", "Artist D", "Artist C", "Artist B"]
+        assert "Artist A" not in [stat.name for stat in result]
+
+    def test_excludes_cancelled_concert_appearances(self, db_session):
+        venue = create_venues(db_session, count=1)[0]
+
+        scheduled_concert = _make_concert_for_artist(db_session, venue, 0, "Tour 1", "Aurora Belle")
+        _add_appearance(db_session, scheduled_concert, "Aurora Belle")
+
+        cancelled_concert = _make_concert_for_artist(db_session, venue, 1, "Tour 2", "Aurora Belle")
+        _add_appearance(db_session, cancelled_concert, "Aurora Belle")
+        cancel_concert(db_session, cancelled_concert.id)
+
+        result = get_top_artists(db_session)
+
+        assert len(result) == 1
+        assert result[0].name == "Aurora Belle"
+        assert result[0].appearances == 1
+
+    def test_excludes_artists_without_appearances(self, db_session):
+        venue = create_venues(db_session, count=1)[0]
+        concert = _make_concert_for_artist(db_session, venue, 0, "Headliner Tour", "Headliner Only")
+        _add_appearance(db_session, concert, "Opening Act")
+
+        result = get_top_artists(db_session)
+
+        names = [stat.name for stat in result]
+        assert "Opening Act" in names
+        assert "Headliner Only" not in names
