@@ -34,3 +34,6 @@ TOUR_COPY_NAME_SUFFIX = os.environ.get("TOUR_COPY_NAME_SUFFIX", " (copy)")
 # Number of remaining tickets at or below which a concert is flagged as
 # "low stock" on the concert list page (but above zero, which is "sold out").
 LOW_STOCK_THRESHOLD = int(os.environ.get("LOW_STOCK_THRESHOLD", "10"))
+
+# Number of artists returned by the "top artists" stats aggregation.
+TOP_ARTISTS_LIMIT = int(os.environ.get("TOP_ARTISTS_LIMIT", "5"))
