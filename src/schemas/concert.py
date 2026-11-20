@@ -388,6 +388,22 @@ class ConcertResponse(BaseModel):
         }
 
 
+class NextConcertResponse(BaseModel):
+    """Schema for the next-concert endpoint's response.
+
+    Deliberately flat (unlike `ConcertNextResponse`'s nested venue/city),
+    matching the `tickets_remaining` naming used elsewhere in this module.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    concert_id: int = Field(..., description="Unique concert identifier")
+    date: datetime = Field(..., description="Concert's scheduled date and time")
+    venue_name: str = Field(..., min_length=1, description="Name of the venue hosting this concert")
+    venue_city: str = Field(..., min_length=1, description="City of the venue hosting this concert")
+    tickets_remaining: int = Field(..., ge=0, description="Number of tickets still available")
+
+
 class ConcertSummary(BaseModel):
     """Minimal read-only summary of a concert, for listing a venue's
     concerts.

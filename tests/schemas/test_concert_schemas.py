@@ -9,7 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from src.models import Concert, Tour, Venue
-from src.schemas.concert import ArtistConcertRead, ConcertPriceUpdate
+from src.schemas.concert import ArtistConcertRead, ConcertPriceUpdate, NextConcertResponse
 
 
 class TestConcertPriceUpdate:
@@ -86,3 +86,67 @@ class TestArtistConcertRead:
 
         with pytest.raises(ValidationError):
             ArtistConcertRead.model_validate(_ConcertWithoutVenue())
+
+
+class TestNextConcertResponse:
+    """Test cases for the `NextConcertResponse` schema."""
+
+    def _valid_payload(self):
+        return {
+            "concert_id": 1,
+            "date": datetime(2024, 7, 15, 20, 0),
+            "venue_name": "Madison Square Garden",
+            "venue_city": "New York",
+            "tickets_remaining": 5000,
+        }
+
+    def test_valid_payload_serialises_date_to_iso8601(self):
+        response = NextConcertResponse(**self._valid_payload())
+
+        dumped = response.model_dump(mode="json")
+
+        assert dumped["date"] == "2024-07-15T20:00:00"
+
+    def test_rejects_negative_tickets_remaining(self):
+        payload = self._valid_payload()
+        payload["tickets_remaining"] = -1
+
+        with pytest.raises(ValidationError):
+            NextConcertResponse(**payload)
+
+    def test_accepts_zero_tickets_remaining(self):
+        payload = self._valid_payload()
+        payload["tickets_remaining"] = 0
+
+        response = NextConcertResponse(**payload)
+
+        assert response.tickets_remaining == 0
+
+    def test_rejects_empty_venue_name(self):
+        payload = self._valid_payload()
+        payload["venue_name"] = ""
+
+        with pytest.raises(ValidationError):
+            NextConcertResponse(**payload)
+
+    def test_rejects_empty_venue_city(self):
+        payload = self._valid_payload()
+        payload["venue_city"] = ""
+
+        with pytest.raises(ValidationError):
+            NextConcertResponse(**payload)
+
+    def test_builds_from_attribute_holding_object(self):
+        class _NextConcert:
+            concert_id = 7
+            date = datetime(2024, 8, 1, 19, 30)
+            venue_name = "Wembley Stadium"
+            venue_city = "London"
+            tickets_remaining = 120
+
+        response = NextConcertResponse.model_validate(_NextConcert())
+
+        assert response.concert_id == 7
+        assert response.venue_name == "Wembley Stadium"
+        assert response.venue_city == "London"
+        assert response.tickets_remaining == 120
