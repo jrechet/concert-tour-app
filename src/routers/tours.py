@@ -27,13 +27,16 @@ from ..schemas import (
     TourSummaryRead,
     TourRevenue,
 )
+from ..schemas.concert import NextConcertResponse
 from ..services.calendar_service import build_tour_calendar
+from ..services.exceptions import NoUpcomingConcert, TourNotFound
 from ..services.occupancy import TourNotFoundError as OccupancyTourNotFoundError, get_tour_occupancy
 from ..services.tour_service import (
     TourConflictError,
     TourNotFoundError,
     cancel_tour,
     duplicate_tour,
+    get_next_concert,
     get_sold_out_tours,
     get_tour_cities,
     get_tour_revenue,
@@ -150,6 +153,43 @@ def get_tour_dates(
         .all()
     )
     return concerts
+
+
+@router.get(
+    "/{tour_id}/next",
+    response_model=NextConcertResponse,
+    responses={
+        404: {
+            "description": "Tour not found, or tour has no upcoming concert",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "tour_not_found": {
+                            "summary": "Tour not found",
+                            "value": {"detail": "Tour 999 not found"},
+                        },
+                        "no_upcoming_concert": {
+                            "summary": "Tour has no upcoming concert",
+                            "value": {"detail": "Tour 999 has no upcoming concert"},
+                        },
+                    }
+                }
+            },
+        },
+    },
+)
+def get_next_concert_endpoint(tour_id: int, db: Session = Depends(get_db)):
+    """Retrieve a tour's next non-cancelled, upcoming concert.
+
+    Returns 404 if the tour doesn't exist, or if it exists but has no
+    concert left to come (no concerts at all, or only past/cancelled ones).
+    """
+    try:
+        return get_next_concert(db, tour_id)
+    except TourNotFound:
+        raise HTTPException(status_code=404, detail=f"Tour {tour_id} not found")
+    except NoUpcomingConcert:
+        raise HTTPException(status_code=404, detail=f"Tour {tour_id} has no upcoming concert")
 
 
 @router.get("/{tour_id}/summary", response_model=TourSummary)
