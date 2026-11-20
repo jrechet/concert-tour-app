@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 
 from ..config import MAX_ARTIST_SEARCH_RESULTS, TOUR_COPY_NAME_SUFFIX
 from ..database import get_reference_time
-from ..models import Concert, Tour, Venue
+from ..models import Concert, ConcertStatus, Tour, Venue
+from ..schemas.concert import NextConcertResponse
 from ..schemas.tour import (
     OCCUPANCY_PERCENTAGE_PRECISION,
     TourCityOut,
@@ -17,6 +18,7 @@ from ..schemas.tour import (
     TourStatus,
     TourSummaryRead,
 )
+from .exceptions import NoUpcomingConcert, TourNotFound
 
 # Not a `TourStatus` member: that enum is reserved for the statuses accepted
 # by `GET /tours`'s `status` query filter, and "cancelled" isn't one of them
@@ -168,6 +170,53 @@ def get_tour_occupancy(db: Session, tour_id: int) -> Optional[TourOccupancySchem
         tickets_sold=tickets_sold,
         total_capacity=total_capacity,
         percentage_sold=percentage_sold,
+    )
+
+
+def get_next_concert(db: Session, tour_id: int) -> NextConcertResponse:
+    """Resolve a tour's next non-cancelled concert, with its venue's name
+    and city joined in the same query (no N+1).
+
+    "Next" is the earliest concert with `date_time >= now` (a concert
+    scheduled for exactly `now` counts as upcoming) and `status !=
+    ConcertStatus.cancelled`; a cancelled concert that would otherwise be
+    the earliest upcoming one is skipped in favour of the next
+    non-cancelled one. `now` comes from `get_reference_time()`, so tests
+    can freeze it. `tickets_remaining` is the venue's capacity minus
+    tickets sold, clamped to 0 rather than going negative.
+
+    Raises `TourNotFound` when no tour with `tour_id` exists, and
+    `NoUpcomingConcert` when the tour exists but has no concert left to
+    come (no concerts at all, or only past/cancelled ones).
+    """
+    if db.query(Tour.id).filter(Tour.id == tour_id).first() is None:
+        raise TourNotFound(tour_id)
+
+    now = get_reference_time()
+
+    row = (
+        db.query(Concert, Venue)
+        .join(Venue, Concert.venue_id == Venue.id)
+        .filter(
+            Concert.tour_id == tour_id,
+            Concert.date_time >= now,
+            Concert.status != ConcertStatus.cancelled,
+        )
+        .order_by(Concert.date_time.asc())
+        .first()
+    )
+    if row is None:
+        raise NoUpcomingConcert(tour_id)
+
+    concert, venue = row
+    tickets_remaining = max((venue.capacity or 0) - (concert.tickets_sold or 0), 0)
+
+    return NextConcertResponse(
+        concert_id=concert.id,
+        date=concert.date_time,
+        venue_name=venue.name,
+        venue_city=venue.city,
+        tickets_remaining=tickets_remaining,
     )
 
 
