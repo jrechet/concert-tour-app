@@ -1,11 +1,12 @@
 """Query logic for artist-level aggregates derived from tours."""
 
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
-from sqlalchemy import func
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
-from ..models import LineupEntry, Tour
+from ..models import Artist, Concert, ConcertStatus, LineupEntry, Tour
+from ..schemas.artist import ArtistDetail
 
 
 def artist_exists(db: Session, artist_id: str) -> bool:
@@ -36,3 +37,29 @@ def list_artists_with_tour_counts(db: Session) -> List[Tuple[str, int]]:
         .all()
     )
     return [(artist, count) for artist, count in rows]
+
+
+def get_artist_detail(db: Session, artist_id: int) -> Optional[ArtistDetail]:
+    """Return the `Artist` row identified by `artist_id` together with its
+    count of non-cancelled concerts, or `None` when no such artist exists.
+
+    The count is computed in a single aggregate query: `LineupEntry` links
+    the artist to its concerts, and the second outer join to `Concert` only
+    matches rows whose `status` isn't `ConcertStatus.cancelled`, so
+    `func.count(Concert.id)` naturally skips cancelled concerts (and any
+    artist with zero lineup entries) without loading concerts into Python.
+    """
+    row = (
+        db.query(Artist.id, Artist.name, func.count(Concert.id).label("concert_count"))
+        .outerjoin(LineupEntry, LineupEntry.artist_id == Artist.id)
+        .outerjoin(
+            Concert,
+            and_(Concert.id == LineupEntry.concert_id, Concert.status != ConcertStatus.cancelled),
+        )
+        .filter(Artist.id == artist_id)
+        .group_by(Artist.id, Artist.name)
+        .first()
+    )
+    if row is None:
+        return None
+    return ArtistDetail.model_validate(row)
