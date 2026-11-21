@@ -6,9 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..schemas.artist import ArtistSummary
+from ..schemas.artist import ArtistDetail, ArtistSummary
 from ..schemas.concert import ArtistConcertRead
-from ..services.artist_service import artist_exists, list_artists_with_tour_counts
+from ..services.artist_service import artist_exists, get_artist_detail, list_artists_with_tour_counts
 from ..services.concert_service import list_concerts_for_artist
 
 router = APIRouter(prefix="/api/v1/artists", tags=["artists"])
@@ -25,6 +25,16 @@ def get_artists(db: Session = Depends(get_db)):
         ArtistSummary(name=name, tour_count=tour_count)
         for name, tour_count in list_artists_with_tour_counts(db)
     ]
+
+
+@router.get("/{artist_id}", response_model=ArtistDetail)
+def get_artist(artist_id: int, db: Session = Depends(get_db)):
+    """Retrieve a single artist by id together with its count of
+    non-cancelled concerts. Raises 404 when `artist_id` is unknown."""
+    detail = get_artist_detail(db, artist_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="Artist not found")
+    return detail
 
 
 @router.get("/{artist_id}/concerts", response_model=List[ArtistConcertRead])
