@@ -14,6 +14,11 @@ class LineupEntry(Base):
     plays earlier); the headliner is excluded here since it's already shown
     separately. It is independent of `set_time`, which is an optional
     scheduled stage time shown alongside the act when known.
+
+    `artist_id` optionally links the entry to a persisted `Artist` row and
+    is this schema's only Artist-to-Concert association (`Artist.concerts`
+    reads through it); it is nullable so entries that only carry a plain
+    `artist_name` keep working.
     """
 
     __tablename__ = "lineup_entries"
@@ -23,12 +28,14 @@ class LineupEntry(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     concert_id = Column(Integer, ForeignKey("concerts.id"), nullable=False, index=True)
+    artist_id = Column(Integer, ForeignKey("artists.id"), nullable=True, index=True)
     artist_name = Column(String(200), nullable=False)
     set_order = Column(Integer, nullable=False)
     set_time = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
 
     concert = relationship("Concert", back_populates="lineup")
+    artist = relationship("Artist")
 
     @validates("set_order")
     def validate_set_order(self, key, value):
