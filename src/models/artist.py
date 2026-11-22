@@ -5,6 +5,8 @@ from sqlalchemy.orm import relationship, validates
 
 from ..database import Base
 
+ARTIST_NAME_MAX_LENGTH = 200
+
 
 class Artist(Base):
     """Artist database model.
@@ -19,7 +21,7 @@ class Artist(Base):
     __tablename__ = "artists"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(200), nullable=False)
+    name = Column(String(ARTIST_NAME_MAX_LENGTH), nullable=False)
 
     concerts = relationship(
         "Concert",
