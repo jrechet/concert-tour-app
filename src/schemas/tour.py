@@ -8,6 +8,7 @@ from enum import Enum
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field, validator
 
+from ..models.tour import TOUR_NAME_MAX_LENGTH
 
 TOUR_CANCEL_REASON_MAX_LENGTH = 500
 OCCUPANCY_PERCENTAGE_PRECISION = 2
@@ -75,6 +76,36 @@ class TourUpdate(BaseModel):
             "example": {
                 "name": "Updated World Tour 2024",
                 "description": "Updated description for the tour"
+            }
+        }
+
+
+class TourRename(BaseModel):
+    """Schema for the request body of a tour rename.
+
+    Named `TourRename` rather than `TourUpdate`: that name is already taken
+    by the general partial-update schema above (optional `artist`,
+    `start_date`, etc.), used by `PUT /api/v1/tours/{id}`. `name` here is
+    required and stripped of surrounding whitespace, mirroring
+    `ArtistUpdate`'s blank-rejection but without making the field optional,
+    since a rename request with no name doesn't make sense.
+    """
+
+    name: str = Field(..., min_length=1, max_length=TOUR_NAME_MAX_LENGTH, description="New tour name")
+
+    @validator('name')
+    def validate_name_not_blank(cls, v):
+        """Strip surrounding whitespace and reject a blank/whitespace-only value."""
+        trimmed = v.strip()
+        if not trimmed:
+            raise ValueError('name must not be empty or whitespace')
+        return trimmed
+
+    class Config:
+        """Pydantic configuration."""
+        schema_extra = {
+            "example": {
+                "name": "Summer Tour"
             }
         }
 
