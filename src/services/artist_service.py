@@ -39,6 +39,21 @@ def list_artists_with_tour_counts(db: Session) -> List[Tuple[str, int]]:
     return [(artist, count) for artist, count in rows]
 
 
+def get_by_name(db: Session, name: str, exclude_id: Optional[int] = None) -> Optional[Artist]:
+    """Return the `Artist` row holding `name`, or `None` if no such row exists.
+
+    `exclude_id` lets a rename check for a *different* artist already
+    holding the target name without tripping over the artist's own current
+    row, so callers can pre-check for the 409 case described in #1018
+    before relying on the `uq_artists_name` database constraint as the
+    backstop against a concurrent rename.
+    """
+    query = db.query(Artist).filter(Artist.name == name)
+    if exclude_id is not None:
+        query = query.filter(Artist.id != exclude_id)
+    return query.first()
+
+
 def get_artist_detail(db: Session, artist_id: int) -> Optional[ArtistDetail]:
     """Return the `Artist` row identified by `artist_id` together with its
     count of non-cancelled concerts, or `None` when no such artist exists.
