@@ -2,9 +2,10 @@
 
 from typing import List, Optional
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from ..config import SEARCH_RESULT_LIMIT
 from ..models import Concert, Venue
 from ..schemas.venue import VenueUpdate
 
@@ -43,6 +44,38 @@ def list_venues(db: Session, min_capacity: Optional[int] = None) -> List[Venue]:
     if min_capacity is not None:
         query = query.filter(Venue.capacity >= min_capacity)
     return query.order_by(Venue.name).all()
+
+
+def _escape_like_wildcards(text: str) -> str:
+    """Escape `\\`, `%`, and `_` so `text` is matched literally by `ILIKE`
+    rather than as LIKE wildcards. Must run before wrapping in `%...%` and
+    be paired with `escape="\\"` on the `ilike` call.
+    """
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def search_venues(db: Session, q: str) -> List[Venue]:
+    """Return venues whose `name` or `city` contains `q` as a
+    case-insensitive substring, ordered by name ascending and capped at
+    `SEARCH_RESULT_LIMIT` results.
+
+    `%` and `_` in `q` are escaped so they are matched literally rather than
+    as LIKE wildcards. A venue matching on both `name` and `city` is still
+    returned only once. Returns `[]` when nothing matches.
+    """
+    pattern = f"%{_escape_like_wildcards(q)}%"
+    return (
+        db.query(Venue)
+        .filter(
+            or_(
+                Venue.name.ilike(pattern, escape="\\"),
+                Venue.city.ilike(pattern, escape="\\"),
+            )
+        )
+        .order_by(Venue.name)
+        .limit(SEARCH_RESULT_LIMIT)
+        .all()
+    )
 
 
 def get_venue_or_none(db: Session, venue_id: int) -> Optional[Venue]:
