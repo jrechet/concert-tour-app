@@ -7,10 +7,19 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ..config import MIN_SEARCH_QUERY_LENGTH
 from ..crud.venue import create_venue, get_venue_with_upcoming_concerts, venue_name_city_exists
 from ..database import get_db
 from ..schemas.concert import ConcertSummary
-from ..schemas.venue import VenueCreate, VenueDeleteConflict, VenueDetailRead, VenueOut, VenueResponse, VenueUpdate
+from ..schemas.venue import (
+    VenueCreate,
+    VenueDeleteConflict,
+    VenueDetailRead,
+    VenueOut,
+    VenueRead,
+    VenueResponse,
+    VenueUpdate,
+)
 from ..services.venue_service import (
     VenueConflictError,
     VenueHasConcertsError,
@@ -19,6 +28,7 @@ from ..services.venue_service import (
     get_venue_or_none,
     list_venue_concerts,
     list_venues,
+    search_venues,
     update_venue,
 )
 
@@ -62,6 +72,16 @@ def get_venues(
     `ValueError` guard for negative input is unreachable from here.
     """
     return list_venues(db, min_capacity=min_capacity)
+
+
+@router.get("/search", response_model=List[VenueRead])
+def search_venues_route(
+    q: str = Query(..., min_length=MIN_SEARCH_QUERY_LENGTH),
+    db: Session = Depends(get_db),
+):
+    """Search venues whose name or city contains `q` (case-insensitive),
+    ordered by name ascending. Returns `[]` when nothing matches."""
+    return search_venues(db, q)
 
 
 @router.get("/{venue_id}", response_model=VenueDetailRead)
