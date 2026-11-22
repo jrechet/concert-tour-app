@@ -3,10 +3,11 @@ Pydantic schemas for Venue entities.
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
-from pydantic import AliasPath, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AliasPath, BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
+from ..config import MIN_SEARCH_QUERY_LENGTH
 from .tour import TourStatus
 
 MIN_VENUE_CAPACITY = 0
@@ -165,3 +166,16 @@ class VenueDetailRead(BaseModel):
     upcoming_concerts: List[VenueConcertRead] = Field(
         default_factory=list, description="Upcoming concerts scheduled at this venue"
     )
+
+
+class VenueSearchQuery(BaseModel):
+    """Query parameters accepted by `GET /api/v1/venues/search`."""
+
+    q: Annotated[str, StringConstraints(strip_whitespace=True, min_length=MIN_SEARCH_QUERY_LENGTH)] = Field(
+        ..., description="Search text to match against venue name/city/country"
+    )
+
+
+# Reuse the existing venue read schema as the item type for search results,
+# rather than duplicating its shape.
+VenueSearchResult = VenueResponse

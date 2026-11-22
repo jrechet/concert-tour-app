@@ -37,3 +37,9 @@ LOW_STOCK_THRESHOLD = int(os.environ.get("LOW_STOCK_THRESHOLD", "10"))
 
 # Number of artists returned by the "top artists" stats aggregation.
 TOP_ARTISTS_LIMIT = int(os.environ.get("TOP_ARTISTS_LIMIT", "5"))
+
+# Minimum length (after stripping whitespace) of a venue search query.
+MIN_SEARCH_QUERY_LENGTH = int(os.environ.get("MIN_SEARCH_QUERY_LENGTH", "2"))
+
+# Upper bound on the number of venues returned by the venue search.
+SEARCH_RESULT_LIMIT = int(os.environ.get("SEARCH_RESULT_LIMIT", "50"))
