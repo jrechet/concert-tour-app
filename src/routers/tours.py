@@ -18,6 +18,7 @@ from ..schemas import (
     TourUpdate,
     TourOccupancyResponse,
     TourRead,
+    TourRename,
     TourResponse,
     TourSearchQuery,
     SoldOutTourRead,
@@ -367,6 +368,19 @@ def duplicate_tour_endpoint(tour_id: int, db: Session = Depends(get_db)):
     if duplicate is None:
         raise HTTPException(status_code=404, detail="Tour not found")
     return duplicate
+
+
+@router.patch("/{tour_id}", response_model=TourResponse, status_code=200)
+def rename_tour(tour_id: int, payload: TourRename, db: Session = Depends(get_db)):
+    """Rename a tour. Raises 404 when `tour_id` is unknown."""
+    tour = db.query(Tour).filter(Tour.id == tour_id).first()
+    if not tour:
+        raise HTTPException(status_code=404, detail="Tour not found")
+
+    tour.name = payload.name
+    db.commit()
+    db.refresh(tour)
+    return tour
 
 
 @router.put("/{tour_id}", response_model=TourResponse)
