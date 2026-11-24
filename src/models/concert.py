@@ -36,6 +36,7 @@ class Concert(Base):
     venue_id = Column(Integer, ForeignKey("venues.id"), nullable=False, index=True)
     date_time = Column(DateTime, nullable=False, index=True)
     ticket_price = Column(Numeric(10, 2), nullable=True)
+    capacity = Column(Integer, nullable=True)
     tickets_sold = Column(Integer, nullable=False, default=0)
     is_cancelled = Column(Boolean, nullable=False, default=False, server_default="0")
     cancellation_reason = Column(String(500), nullable=True)
@@ -67,17 +68,32 @@ class Concert(Base):
         cascade="all, delete-orphan",
     )
 
+    @validates("capacity")
+    def validate_capacity(self, key, value):
+        """Reject a negative capacity. `None` is allowed, meaning this
+        concert has no capacity of its own and falls back to its venue's
+        capacity (see `_effective_capacity`).
+        """
+        if value is not None and value < 0:
+            raise ValueError("capacity cannot be negative")
+        return value
+
     @validates("tickets_sold")
     def validate_tickets_sold(self, key, value):
-        """Reject negative sales counts and sales that exceed the venue's
-        capacity (when the venue is already attached to this concert).
+        """Reject negative sales counts and sales that exceed this
+        concert's effective capacity: its own `capacity` when set,
+        otherwise the venue's capacity (when the venue is already attached
+        to this concert).
         """
         if value is None:
             return value
         if value < 0:
             raise ValueError("tickets_sold cannot be negative")
-        if self.venue is not None and self.venue.capacity is not None and value > self.venue.capacity:
-            raise ValueError("tickets_sold cannot exceed venue capacity")
+        capacity = self.capacity
+        if capacity is None and self.venue is not None:
+            capacity = self.venue.capacity
+        if capacity is not None and value > capacity:
+            raise ValueError("tickets_sold cannot exceed capacity")
         return value
 
     @validates("status")
@@ -114,10 +130,25 @@ class Concert(Base):
         return max(self.venue.capacity - (self.tickets_sold or 0), 0)
 
     @property
+    def _effective_capacity(self):
+        """This concert's own `capacity` when set, otherwise its venue's
+        capacity, otherwise `None` when neither is known."""
+        if self.capacity is not None:
+            return self.capacity
+        return self.venue.capacity if self.venue is not None else None
+
+    @property
     def tickets_remaining(self):
-        """Alias for `remaining_tickets` matching the `tickets_`-prefixed
-        naming used elsewhere (e.g. `tickets_sold`)."""
-        return self.remaining_tickets
+        """Tickets still available, derived from `_effective_capacity`
+        and `tickets_sold`, clamped to never go below 0.
+
+        Returns `None` when no capacity (own or the venue's) is known,
+        since remaining count can't be computed without one.
+        """
+        capacity = self._effective_capacity
+        if capacity is None:
+            return None
+        return max(capacity - (self.tickets_sold or 0), 0)
 
     @property
     def percentage_sold(self):
@@ -140,9 +171,12 @@ class Concert(Base):
 
     @property
     def is_sold_out(self):
-        """Alias for `sold_out` matching the `is_`-prefixed naming used by
-        `is_cancelled`/`is_almost_sold_out`, for API consumers."""
-        return self.sold_out
+        """Whether every ticket for this concert has been sold, based on
+        `tickets_remaining`. `False` when no capacity (own or the venue's)
+        is known, since sold-out status can't be determined without one.
+        """
+        remaining = self.tickets_remaining
+        return remaining is not None and remaining <= 0
 
     @property
     def is_almost_sold_out(self):
