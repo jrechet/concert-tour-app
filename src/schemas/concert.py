@@ -21,6 +21,11 @@ TICKET_PRICE_MAX_DIGITS = 10
 TICKET_PRICE_DECIMAL_PLACES = 2
 MIN_TICKET_PRICE = Decimal("0")
 
+# Local alias so `ConcertOut.date` (a field literally named `date`) can be
+# annotated with the `date` type without pydantic mistaking the field for
+# its own type annotation.
+_ConcertOutDate = date
+
 
 class ConcertCreate(BaseModel):
     """Schema for creating a new concert."""
@@ -538,3 +543,31 @@ class SoldOutConcertRead(BaseModel):
         """Ignore whatever value is supplied; this listing only ever
         contains sold-out concerts, so remaining tickets is always 0."""
         return 0
+
+
+class ConcertOut(BaseModel):
+    """Read-only response schema for `GET /api/concerts/upcoming`.
+
+    `title` is sourced from the concert's parent tour, since `Concert` has
+    no title column of its own, matching the pattern used by
+    `ConcertSummary`/`ConcertWeekItem`/`SoldOutConcertRead`. `date` is
+    sourced from the `Concert.date_time` column via `validation_alias`,
+    exposing only the calendar date (not the time of day) it carries.
+    """
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: int = Field(..., description="Unique concert identifier")
+    title: str = Field(
+        ..., validation_alias=AliasPath("tour", "name"), description="Title of the tour this concert belongs to"
+    )
+    date: _ConcertOutDate = Field(..., validation_alias="date_time", description="Concert date")
+    venue_id: int = Field(..., description="ID of the venue hosting this concert")
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def extract_date_from_date_time(cls, v):
+        """Reduce `Concert.date_time` (a `datetime`) to its calendar date,
+        since pydantic otherwise rejects a `datetime` with a non-midnight
+        time when validating a `date` field."""
+        return v.date() if isinstance(v, datetime) else v
