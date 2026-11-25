@@ -42,6 +42,7 @@ from ..schemas import (
     TicketPurchaseRequest,
     TicketTierRead,
 )
+from ..schemas.concert import ConcertOut
 from ..services.concerts_service import (
     MAX_CITY_QUERY_LENGTH,
     ConcertCancelledError,
@@ -68,6 +69,7 @@ from ..services.concert_service import (
     duplicate_concert,
     get_concerts_for_week,
     get_headliner,
+    list_upcoming_concerts,
     uncancel_concert,
 )
 from ..services.lineup_service import (
@@ -80,12 +82,23 @@ from ..services.lineup_service import (
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
 api_router = APIRouter(prefix="/api/v1/concerts", tags=["concerts"])
 page_router = APIRouter(tags=["concerts-page"])
+upcoming_router = APIRouter(prefix="/api/concerts", tags=["concerts"])
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
 TRUTHY_VALUES = {"true", "1", "yes", "on"}
+
+
+@upcoming_router.get("/upcoming", response_model=List[ConcertOut])
+def get_upcoming_concerts_endpoint(db: Session = Depends(get_db)):
+    """Retrieve concerts dated today or later, soonest first.
+
+    Returns an empty list (not a 404) when none are upcoming. All
+    filtering/ordering logic lives in `list_upcoming_concerts`.
+    """
+    return list_upcoming_concerts(db)
 
 
 def coerce_show_past(show_past: Optional[str] = Query(None, description="When 'true', past concerts are included alongside upcoming ones")) -> bool:
