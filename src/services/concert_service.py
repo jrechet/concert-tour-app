@@ -1,8 +1,10 @@
 """Query logic for an artist's concerts, joined through the concert lineup,
 plus the concert duplication service."""
 
-from datetime import datetime, timedelta, timezone
+import os
+from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session, joinedload
 
@@ -13,6 +15,43 @@ from .concerts_service import ConcertNotFoundError
 # A module-level constant rather than an inline `7` so the window can be
 # tuned (or later made env-configurable) in one place.
 WEEK_WINDOW_DAYS = 7
+
+# Timezone `_today()` resolves "today" in, for `list_upcoming_concerts`'s
+# default boundary. Env-configurable rather than hardcoded, since "today"
+# is only meaningful relative to a specific timezone.
+UPCOMING_CONCERTS_TIMEZONE = os.environ.get("UPCOMING_CONCERTS_TIMEZONE", "UTC")
+
+
+def _today() -> date:
+    """Current calendar date in `UPCOMING_CONCERTS_TIMEZONE`.
+
+    The single source of truth for `list_upcoming_concerts`'s default
+    `today`, so tests can monkeypatch this function to control the
+    boundary instead of depending on the real wall clock.
+    """
+    return datetime.now(ZoneInfo(UPCOMING_CONCERTS_TIMEZONE)).date()
+
+
+def list_upcoming_concerts(db: Session, today: Optional[date] = None) -> List[Concert]:
+    """Return every concert dated `today` or later, ordered soonest first,
+    with `id` ascending as a stable tiebreak for concerts sharing the same
+    date.
+
+    `today` defaults to `_today()` when omitted. `Concert.date_time` is
+    stored as a full timestamp, so the comparison is against midnight of
+    `today`, which includes every concert dated `today` regardless of its
+    time of day. Returns `[]`, never `None`, when nothing matches.
+    """
+    if today is None:
+        today = _today()
+    start_of_today = datetime.combine(today, datetime.min.time())
+
+    return (
+        db.query(Concert)
+        .filter(Concert.date_time >= start_of_today)
+        .order_by(Concert.date_time.asc(), Concert.id.asc())
+        .all()
+    )
 
 
 class VenueScheduleConflictError(Exception):
