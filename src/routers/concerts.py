@@ -45,6 +45,7 @@ from ..schemas import (
 from ..schemas.concert import ConcertOut
 from ..services.concerts_service import (
     MAX_CITY_QUERY_LENGTH,
+    MAX_VENUE_QUERY_LENGTH,
     ConcertCancelledError,
     ConcertCapacityExceededError,
     ConcertNotFoundError,
@@ -132,6 +133,36 @@ def get_price_filter(
         )
 
 
+def get_venue_filter(
+    venue: Optional[str] = Query(
+        None,
+        min_length=1,
+        max_length=MAX_VENUE_QUERY_LENGTH,
+        description="Filter concerts to the venue whose name matches this text (case-insensitive)",
+    ),
+) -> Optional[str]:
+    """Validate the `venue` query param for `GET /api/v1/concerts`.
+
+    `min_length`/`max_length` on the `Query` itself reject a blank or
+    over-length value with a 422 before this dependency even runs; a
+    whitespace-only value (e.g. `?venue=%20`) satisfies `min_length` but is
+    still meaningless, so it's rejected here the same way, as a
+    `RequestValidationError`, rather than reaching the database. Omitting
+    the parameter entirely passes `None` through unchanged.
+    """
+    if venue is not None and not venue.strip():
+        raise RequestValidationError(
+            [
+                {
+                    "loc": ("query", "venue"),
+                    "msg": "venue must not be blank or whitespace-only",
+                    "type": "value_error",
+                }
+            ]
+        )
+    return venue
+
+
 def get_date_range_query(
     start: date = Query(..., description="Start of the date range (YYYY-MM-DD), inclusive"),
     end: date = Query(..., description="End of the date range (YYYY-MM-DD), inclusive"),
@@ -174,9 +205,7 @@ def get_concerts(
         max_length=MAX_CITY_QUERY_LENGTH,
         description="Filter concerts to venues whose city contains this text (case-insensitive)",
     ),
-    venue: Optional[str] = Query(
-        None, description="Filter concerts to the venue whose name matches this text (case-insensitive)"
-    ),
+    venue: Optional[str] = Depends(get_venue_filter),
     artist_name: Optional[str] = Query(
         None, description="Filter concerts to tours whose artist name contains this text (case-insensitive)"
     ),
@@ -210,11 +239,13 @@ def get_concerts(
     When `city` is provided and non-blank, results are narrowed to concerts
     whose venue city contains that text (case-insensitive substring match)
     before pagination is applied; a blank value is treated the same as
-    omitting the filter. When `venue` is provided and non-blank, results are
-    narrowed to concerts whose venue name exactly matches that text
-    (case-insensitive) before pagination is applied; a blank value is
-    treated the same as omitting the filter, and a name with no matching
-    venue yields an empty list rather than an error. When `artist_name` is provided, results are narrowed to
+    omitting the filter. When `venue` is provided, results are narrowed to
+    concerts whose venue name exactly matches that text (case-insensitive)
+    before pagination is applied; omitting it keeps the unfiltered list, but
+    (unlike `city`) a blank or whitespace-only value is rejected with a 422
+    rather than treated as "no filter", via `get_venue_filter`. A
+    syntactically valid venue name with no matching venue yields an empty
+    list rather than an error. When `artist_name` is provided, results are narrowed to
     concerts whose tour artist name contains that text (case-insensitive
     substring match) before pagination is applied. When `include_cancelled`
     is false, cancelled concerts are excluded before pagination is applied;

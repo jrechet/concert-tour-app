@@ -18,6 +18,9 @@ CSV_HEADER = ["date", "city", "venue", "tour"]
 
 MAX_CITY_QUERY_LENGTH = 100
 
+# Upper bound on the `venue` query parameter accepted by `GET /api/v1/concerts`.
+MAX_VENUE_QUERY_LENGTH = 200
+
 
 class ConcertNotFoundError(Exception):
     """Raised by `sell_tickets` when no concert with the given id exists."""
