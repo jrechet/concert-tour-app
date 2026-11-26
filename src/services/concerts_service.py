@@ -77,16 +77,25 @@ def is_past(concert: Concert, reference_time: Optional[datetime] = None) -> bool
     return concert.date_time.date() < reference_time.date()
 
 
-def list_concerts(db: Session, city: Optional[str] = None) -> List[Concert]:
+def list_concerts(
+    db: Session, city: Optional[str] = None, venue: Optional[str] = None
+) -> List[Concert]:
     """Return every concert, ordered by date ascending, optionally narrowed
-    to those whose venue city matches `city`.
+    to those whose venue city matches `city` and/or whose venue name
+    matches `venue`.
 
-    `city` is stripped of surrounding whitespace; when the result is `None`
-    or empty, every concert is returned, unfiltered. Otherwise, concerts are
-    narrowed via a case-insensitive partial match (`ILIKE`-style `contains`)
-    against the venue's city, joined through the real `Concert.venue`
-    foreign key rather than a denormalised column. Raises `ValueError` when
-    `city` exceeds `MAX_CITY_QUERY_LENGTH` characters.
+    `city` and `venue` are each stripped of surrounding whitespace; when
+    either is `None` or empty after stripping, that filter is skipped. Otherwise:
+    - `city` narrows via a case-insensitive partial match (`ILIKE`-style
+      `contains`) against the venue's city.
+    - `venue` narrows via a case-insensitive exact match against the venue's
+      name, using `func.lower(...) == func.lower(...)` rather than `ilike` so
+      that `%`/`_` in the input are matched literally rather than as
+      wildcards; a name with no matching venue yields an empty list.
+
+    Both filters join through the real `Concert.venue` foreign key rather
+    than a denormalised column. Raises `ValueError` when `city` exceeds
+    `MAX_CITY_QUERY_LENGTH` characters.
     """
     if city is not None:
         city = city.strip()
@@ -94,11 +103,17 @@ def list_concerts(db: Session, city: Optional[str] = None) -> List[Concert]:
             raise ValueError(
                 f"city must not exceed {MAX_CITY_QUERY_LENGTH} characters"
             )
+    if venue is not None:
+        venue = venue.strip()
 
     query = db.query(Concert).options(joinedload(Concert.venue)).order_by(Concert.date_time)
 
-    if city:
-        query = query.join(Concert.venue).filter(func.lower(Venue.city).contains(city.lower()))
+    if city or venue:
+        query = query.join(Concert.venue)
+        if city:
+            query = query.filter(func.lower(Venue.city).contains(city.lower()))
+        if venue:
+            query = query.filter(func.lower(Venue.name) == func.lower(venue))
 
     return query.all()
 
