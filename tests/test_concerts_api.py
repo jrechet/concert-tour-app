@@ -8,7 +8,7 @@ venue_id=1.
 
 from datetime import datetime, timedelta
 
-from src.services.concerts_service import MAX_CITY_QUERY_LENGTH
+from src.services.concerts_service import MAX_CITY_QUERY_LENGTH, MAX_VENUE_QUERY_LENGTH
 from tests.fixtures.dashboard_fixtures import create_concert, create_tour, create_venues
 
 
@@ -418,3 +418,113 @@ class TestConcertListCityQueryParam:
 
         assert response.status_code == 422
         assert "detail" in response.json()
+
+
+class TestConcertListVenueQueryParam:
+    """`GET /api/v1/concerts/` accepts an optional `venue` filter, narrowed
+    to concerts whose venue name exactly matches the given text
+    (case-insensitive). Unlike `city`, a blank or whitespace-only value is
+    rejected with a 422 rather than treated as "no filter"."""
+
+    def _seed_three_venues(self, db_session):
+        tour = create_tour(
+            db_session,
+            name="Venue Filter Tour",
+            artist="Test Artist",
+            start_date=(datetime.now() - timedelta(days=1)).date(),
+            end_date=(datetime.now() + timedelta(days=90)).date(),
+            status="active",
+        )
+        venues = create_venues(db_session, count=3)  # Madison Square Garden, The O2 Arena, Accor Arena
+        base_time = datetime.now()
+        for i, venue in enumerate(venues):
+            create_concert(db_session, tour, venue, day_offset=i, ticket_price="50.00", base_time=base_time)
+        return venues
+
+    def test_get_concerts_filtered_by_venue_returns_200_and_only_matching(self, client, db_session):
+        venues = self._seed_three_venues(db_session)
+        target = venues[0]
+
+        response = client.get("/api/v1/concerts/", params={"venue": target.name})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["venue_id"] == target.id
+
+    def test_get_concerts_venue_filter_is_case_insensitive(self, client, db_session):
+        venues = self._seed_three_venues(db_session)
+        target = venues[0]
+
+        lower = client.get("/api/v1/concerts/", params={"venue": target.name.lower()})
+        upper = client.get("/api/v1/concerts/", params={"venue": target.name.upper()})
+        mixed = client.get("/api/v1/concerts/", params={"venue": target.name.swapcase()})
+
+        assert lower.status_code == upper.status_code == mixed.status_code == 200
+        assert lower.json() == upper.json() == mixed.json()
+        assert len(lower.json()) == 1
+        assert lower.json()[0]["venue_id"] == target.id
+
+    def test_get_concerts_without_venue_param_returns_200_full_list(self, client, db_session):
+        venues = self._seed_three_venues(db_session)
+
+        response = client.get("/api/v1/concerts/")
+
+        assert response.status_code == 200
+        assert len(response.json()) == len(venues)
+
+    def test_get_concerts_empty_venue_returns_422(self, client, db_session):
+        self._seed_three_venues(db_session)
+
+        response = client.get("/api/v1/concerts/", params={"venue": ""})
+
+        assert response.status_code == 422
+
+    def test_get_concerts_whitespace_only_venue_returns_422(self, client, db_session):
+        self._seed_three_venues(db_session)
+
+        response = client.get("/api/v1/concerts/", params={"venue": "   "})
+
+        assert response.status_code == 422
+
+    def test_get_concerts_overlong_venue_returns_422(self, client, db_session):
+        self._seed_three_venues(db_session)
+        too_long = "a" * (MAX_VENUE_QUERY_LENGTH + 1)
+
+        response = client.get("/api/v1/concerts/", params={"venue": too_long})
+
+        assert response.status_code == 422
+
+    def test_get_concerts_unknown_venue_returns_200_empty_list(self, client, db_session):
+        self._seed_three_venues(db_session)
+
+        response = client.get("/api/v1/concerts/", params={"venue": "Nonexistent Arena"})
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_get_concerts_venue_filter_with_pagination_returns_200(self, client, db_session):
+        tour = create_tour(
+            db_session,
+            name="Venue Pagination Tour",
+            artist="Test Artist",
+            start_date=(datetime.now() - timedelta(days=1)).date(),
+            end_date=(datetime.now() + timedelta(days=90)).date(),
+            status="active",
+        )
+        target_venue, other_venue = create_venues(db_session, count=2)
+        base_time = datetime.now()
+        for i in range(3):
+            create_concert(db_session, tour, target_venue, day_offset=i, ticket_price="50.00", base_time=base_time)
+        create_concert(db_session, tour, other_venue, day_offset=10, ticket_price="50.00", base_time=base_time)
+
+        response = client.get(
+            "/api/v1/concerts/",
+            params={"venue": target_venue.name, "page": 1, "page_size": 2},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 2
+        assert all(item["venue_id"] == target_venue.id for item in data)
+        assert response.headers["X-Total-Count"] == "3"
