@@ -184,7 +184,21 @@ def get_date_range_query(
         )
 
 
-@api_router.get("/", response_model=List[ConcertResponse])
+@api_router.get(
+    "/",
+    response_model=List[ConcertResponse],
+    responses={
+        200: {
+            "description": "A page of concerts matching the request.",
+            "headers": {
+                "X-Total-Count": {
+                    "description": "Total number of concerts matching the request (after filters, before pagination).",
+                    "schema": {"type": "integer"},
+                },
+            },
+        },
+    },
+)
 def get_concerts(
     response: Response,
     page: int = Query(1, ge=1, description="1-indexed page number"),
