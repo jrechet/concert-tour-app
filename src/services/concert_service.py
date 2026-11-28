@@ -163,6 +163,24 @@ def list_concerts_for_artist(db: Session, artist_id: str) -> List[Concert]:
     )
 
 
+def get_concerts_for_export(db: Session) -> List[Concert]:
+    """Return every concert, with its venue and tour eager-loaded, ordered
+    by `date_time` ascending then `id` ascending.
+
+    `venue`/`tour` are loaded via `joinedload` in the same round-trip, so
+    a caller (e.g. a CSV serializer) can read `concert.venue`/`concert.tour`
+    on every result without triggering an N+1 query per concert. No
+    pagination or filters: every concert is returned, including cancelled
+    ones. Returns `[]`, never `None`, when there are no concerts.
+    """
+    return (
+        db.query(Concert)
+        .options(joinedload(Concert.venue), joinedload(Concert.tour))
+        .order_by(Concert.date_time.asc(), Concert.id.asc())
+        .all()
+    )
+
+
 def get_concerts_for_week(db: Session, now: Optional[datetime] = None) -> List[Concert]:
     """Return every non-cancelled concert starting within the coming week,
     i.e. in `[now, now + WEEK_WINDOW_DAYS days]` inclusive of both ends,
